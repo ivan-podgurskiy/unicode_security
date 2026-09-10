@@ -25,10 +25,16 @@ defmodule UnicodeSecurity.MixProject do
     ]
   end
 
-  def application, do: []
+  def application, do: [extra_applications: extra_applications(Mix.env())]
 
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(:dev), do: ["lib", "dev"]
+  defp elixirc_paths(:test), do: ["lib", "dev", "test/support"]
   defp elixirc_paths(_environment), do: ["lib"]
+
+  defp extra_applications(environment) when environment in [:dev, :test],
+    do: [:inets, :ssl]
+
+  defp extra_applications(_environment), do: []
 
   defp deps do
     [
