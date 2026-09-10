@@ -12,6 +12,8 @@ defmodule UnicodeSecurity.Utf8 do
     decode(input, 0, [])
   end
 
+  def decode!(_input), do: raise(ArgumentError, "expected a binary input")
+
   defp decode(<<>>, _offset, acc), do: Enum.reverse(acc)
 
   defp decode(<<scalar, rest::binary>>, offset, acc) when scalar < 0x80,

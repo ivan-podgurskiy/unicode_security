@@ -4,6 +4,17 @@ defmodule UnicodeSecurity.NormalizationTest do
   alias UnicodeSecurity.{InvalidInputError, Normalization}
   alias UnicodeSecurity.Test.UnicodeFixtures
 
+  for {name, input} <- [
+        {"nil", nil},
+        {"an integer", 42},
+        {"a charlist", [65, 233]},
+        {"a non-byte-aligned bitstring", <<1::1>>}
+      ] do
+    test "rejects #{name} with ArgumentError" do
+      assert_raise ArgumentError, fn -> Normalization.nfd(unquote(Macro.escape(input))) end
+    end
+  end
+
   test "satisfies all five NFD invariants for every official normalization row" do
     rows =
       Enum.reduce(UnicodeFixtures.normalization_rows(), 0, fn {line, [c1, c2, c3, c4, c5]},

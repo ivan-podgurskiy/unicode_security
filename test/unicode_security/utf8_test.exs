@@ -3,6 +3,17 @@ defmodule UnicodeSecurity.Utf8Test do
 
   alias UnicodeSecurity.{InvalidInputError, Utf8}
 
+  for {name, input} <- [
+        {"nil", nil},
+        {"an integer", 42},
+        {"a charlist", [65, 233]},
+        {"a non-byte-aligned bitstring", <<1::1>>}
+      ] do
+    test "rejects #{name} with ArgumentError" do
+      assert_raise ArgumentError, fn -> Utf8.decode!(unquote(Macro.escape(input))) end
+    end
+  end
+
   test "decodes empty input and ASCII including NUL with byte offsets" do
     assert Utf8.decode!("") == []
     assert Utf8.decode!(<<0, ?A, 127>>) == [{0, 0}, {?A, 1}, {127, 2}]
