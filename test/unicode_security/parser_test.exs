@@ -31,11 +31,23 @@ defmodule UnicodeSecurity.ParserTest do
     end
   end
 
+  test "rejects scalar endpoints whose range crosses the surrogate block" do
+    assert_raise ArgumentError, ~r/Unicode scalar range/, fn ->
+      Parser.ranges!("D7FF..E000 ; 0\n", :integer)
+    end
+  end
+
   test "packs sorted ranges into fixed-width binary records" do
     packed = Packer.ranges([{0x0300, 0x0314, 230}, {0x0315, 0x0315, 232}])
 
     assert packed ==
              <<0x0300::32, 0x0314::32, 230::16, 0x0315::32, 0x0315::32, 232::16>>
+  end
+
+  test "refuses to pack a range crossing the surrogate block" do
+    assert_raise ArgumentError, ~r/Unicode scalar range/, fn ->
+      Packer.ranges([{0xD7FF, 0xE000, 0}])
+    end
   end
 
   test "packs variable mappings with an index" do

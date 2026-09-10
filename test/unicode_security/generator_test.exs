@@ -1,18 +1,51 @@
 defmodule UnicodeSecurity.GeneratorTest do
   use ExUnit.Case, async: false
 
-  import ExUnit.CaptureIO
-
   alias UnicodeSecurity.Data.Normalization
   alias UnicodeSecurity.UnicodeData.Generator
   alias UnicodeSecurity.UnicodeData.Source
 
-  test "generates deterministic compilable normalization tables" do
+  test "generates deterministic normalization tables" do
     root = temporary_directory()
-    source_directory = Path.join(root, "sources")
+    source_directory = write_sources!(root)
     first_output = Path.join(root, "first")
     second_output = Path.join(root, "second")
 
+    first_path = Generator.generate!(source_directory, first_output)
+    second_path = Generator.generate!(source_directory, second_output)
+    first_contents = File.read!(first_path)
+
+    assert first_contents == File.read!(second_path)
+    assert String.ends_with?(first_contents, "\n")
+    refute first_contents =~ source_directory
+    refute first_contents =~ ~r/\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/
+  end
+
+  test "compiles fixture tables without replacing the loaded normalization module" do
+    root = temporary_directory()
+    source_directory = write_sources!(root)
+    generated_path = Generator.generate!(source_directory, Path.join(root, "compiled"))
+
+    assert Normalization.decomposition(0x1200) == nil
+
+    verification = """
+    [{UnicodeSecurity.Data.Normalization, _bytecode}] = Code.compile_file(#{inspect(generated_path)})
+    [0x0041, 0x0300] = UnicodeSecurity.Data.Normalization.decomposition(0x00C0)
+    nil = UnicodeSecurity.Data.Normalization.decomposition(0x00A0)
+    [0x0041, 0x0300] = UnicodeSecurity.Data.Normalization.decomposition(0x1200)
+    230 = UnicodeSecurity.Data.Normalization.combining_class(0x0300)
+    232 = UnicodeSecurity.Data.Normalization.combining_class(0x0315)
+    0 = UnicodeSecurity.Data.Normalization.combining_class(0x0041)
+    """
+
+    elixir = System.find_executable("elixir") || raise "elixir executable not found"
+    assert {"", 0} = System.cmd(elixir, ["-e", verification], stderr_to_stdout: true)
+
+    assert Normalization.decomposition(0x1200) == nil
+  end
+
+  defp write_sources!(root) do
+    source_directory = Path.join(root, "sources")
     File.mkdir_p!(source_directory)
 
     additional_mappings =
@@ -34,26 +67,7 @@ defmodule UnicodeSecurity.GeneratorTest do
     )
 
     write_lock!(root, source_directory)
-
-    first_path = Generator.generate!(source_directory, first_output)
-    second_path = Generator.generate!(source_directory, second_output)
-    first_contents = File.read!(first_path)
-
-    assert first_contents == File.read!(second_path)
-    assert String.ends_with?(first_contents, "\n")
-    refute first_contents =~ source_directory
-    refute first_contents =~ ~r/\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/
-
-    capture_io(:stderr, fn ->
-      assert [{Normalization, _bytecode}] = Code.compile_file(first_path)
-    end)
-
-    assert Normalization.decomposition(0x00C0) == [0x0041, 0x0300]
-    assert Normalization.decomposition(0x00A0) == nil
-    assert Normalization.decomposition(0x1200) == [0x0041, 0x0300]
-    assert Normalization.combining_class(0x0300) == 230
-    assert Normalization.combining_class(0x0315) == 232
-    assert Normalization.combining_class(0x0041) == 0
+    source_directory
   end
 
   defp write_lock!(root, source_directory) do

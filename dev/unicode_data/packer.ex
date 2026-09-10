@@ -55,6 +55,10 @@ defmodule UnicodeSecurity.UnicodeData.Packer do
         raise ArgumentError, "descending packed range: #{hex(first)}..#{hex(last)}"
       end
 
+      unless scalar_range?(first, last) do
+        raise ArgumentError, "invalid Unicode scalar range: #{hex(first)}..#{hex(last)}"
+      end
+
       ordered_after!(first, previous_last, :range)
 
       unless is_integer(value) and value in 0..@maximum_count do
@@ -82,6 +86,10 @@ defmodule UnicodeSecurity.UnicodeData.Packer do
 
   defp scalar!(codepoint),
     do: raise(ArgumentError, "invalid Unicode scalar: #{inspect(codepoint)}")
+
+  defp scalar_range?(first, last) do
+    first <= last and (last < 0xD800 or first > 0xDFFF)
+  end
 
   defp hex(codepoint), do: codepoint |> Integer.to_string(16) |> String.upcase()
 end

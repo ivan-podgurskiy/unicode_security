@@ -136,6 +136,10 @@ defmodule UnicodeSecurity.UnicodeData.Parser do
           raise ArgumentError, "descending Unicode range: #{range}"
         end
 
+        unless scalar_range?(first, last) do
+          raise ArgumentError, "invalid Unicode scalar range: #{range}"
+        end
+
         {first, last}
 
       _invalid ->
@@ -205,6 +209,10 @@ defmodule UnicodeSecurity.UnicodeData.Parser do
       {integer, ""} when integer in 0..0xFFFF -> integer
       _invalid -> raise ArgumentError, "invalid non-negative 16-bit integer: #{inspect(decimal)}"
     end
+  end
+
+  defp scalar_range?(first, last) do
+    first <= last and (last < 0xD800 or first > 0xDFFF)
   end
 
   defp hex(codepoint), do: codepoint |> Integer.to_string(16) |> String.upcase()
