@@ -5,6 +5,88 @@ defmodule UnicodeSecurity.GeneratorTest do
   alias UnicodeSecurity.UnicodeData.Generator
   alias UnicodeSecurity.UnicodeData.Source
 
+  # Catches nonportable provenance, omitted sources, and nondeterministic generation.
+  test "generates deterministic literal manifest from all declarations and locked bytes" do
+    root = temporary_directory()
+    source_directory = write_sources!(root)
+    first_path = Generator.generate_manifest!(source_directory, Path.join(root, "first"))
+    second_path = Generator.generate_manifest!(source_directory, Path.join(root, "second"))
+    contents = File.read!(first_path)
+
+    assert contents == File.read!(second_path)
+    assert String.ends_with?(contents, "\n")
+    refute contents =~ root
+
+    {lock, []} = Code.eval_file(Path.join(root, "sources.lock"))
+
+    expected = %{
+      release_status: :draft,
+      sources:
+        Source.sources()
+        |> Enum.sort_by(& &1.name)
+        |> Enum.map(&Map.merge(&1, Map.fetch!(lock, &1.name)))
+    }
+
+    verification = """
+    [{UnicodeSecurity.Data.Manifest, _}] = Code.compile_file(#{inspect(first_path)})
+    expected = #{inspect(expected, limit: :infinity)}
+    true = UnicodeSecurity.Data.Manifest.get() == expected
+    """
+
+    elixir = System.find_executable("elixir") || raise "elixir executable not found"
+    assert {"", 0} = System.cmd(elixir, ["-e", verification], stderr_to_stdout: true)
+  end
+
+  test "refuses manifest generation when a conformance-only source changes" do
+    root = temporary_directory()
+    source_directory = write_sources!(root)
+    File.write!(Path.join(source_directory, "NormalizationTest.txt"), "tampered\n")
+
+    assert_raise ArgumentError, ~r/byte-size mismatch for NormalizationTest.txt/, fn ->
+      Generator.generate_manifest!(source_directory, Path.join(root, "output"))
+    end
+
+    refute File.exists?(Path.join(root, "output/manifest.ex"))
+  end
+
+  test "offline checker accepts reproduced modules and rejects drift in each output" do
+    root = checker_project!()
+    assert {"", 0} = run_check(root, "check_generated.exs")
+
+    for name <- ["normalization.ex", "confusables.ex", "manifest.ex"] do
+      path = Path.join(root, "lib/unicode_security/data/#{name}")
+      original = File.read!(path)
+      File.write!(path, original <> "# drift\n")
+      {output, status} = run_check(root, "check_generated.exs")
+      assert status != 0
+      assert output =~ "generated data mismatch: #{name}"
+      assert File.read!(path) == original <> "# drift\n"
+      File.write!(path, original)
+    end
+  end
+
+  test "offline checker verifies all locked sources before accepting generated files" do
+    root = checker_project!()
+    File.write!(Path.join(root, "priv/unicode/18.0.0-draft/NormalizationTest.txt"), "tampered\n")
+
+    {output, status} = run_check(root, "check_generated.exs")
+    assert status != 0
+    assert output =~ "byte-size mismatch for NormalizationTest.txt"
+  end
+
+  test "release gate reports the intentional draft block and checks generated data first" do
+    root = checker_project!()
+
+    assert {"release blocked: Unicode 18.0.0 data status is draft\n", 1} =
+             run_check(root, "check_release_data.exs")
+
+    File.write!(Path.join(root, "lib/unicode_security/data/manifest.ex"), "# stale\n")
+    {output, status} = run_check(root, "check_release_data.exs")
+    assert status != 0
+    assert output =~ "generated data mismatch: manifest.ex"
+    refute output =~ "release blocked:"
+  end
+
   # Catches unsorted packed indices, dropped multi-scalar values, misses, and nondeterminism.
   test "generates deterministic confusable mappings with working packed lookups" do
     root = temporary_directory()
@@ -106,21 +188,46 @@ defmodule UnicodeSecurity.GeneratorTest do
       "1200 ; 0041 0300 ; MA\n0430 ; 0061 ; MA\n006D ; 0072 006E ; MA\n"
     )
 
+    File.write!(Path.join(source_directory, "NormalizationTest.txt"), "# fixture\n")
+
     write_lock!(root, source_directory)
     source_directory
   end
 
   defp write_lock!(root, source_directory) do
-    declarations =
-      Enum.filter(
-        Source.sources(),
-        &(&1.name in ["UnicodeData.txt", "DerivedCombiningClass.txt", "confusables.txt"])
-      )
-
-    lock = Source.lock!(declarations, source_directory)
+    lock = Source.lock!(Source.sources(), source_directory)
     contents = inspect(lock, pretty: true, limit: :infinity, printable_limit: :infinity)
 
     File.write!(Path.join(root, "sources.lock"), contents <> "\n")
+  end
+
+  defp checker_project! do
+    root = temporary_directory()
+    File.mkdir_p!(Path.join(root, "scripts"))
+
+    for script <- ["check_generated.exs", "check_release_data.exs"] do
+      assert File.regular?(Path.join("scripts", script)), "missing #{script}"
+      File.cp!(Path.join("scripts", script), Path.join(root, "scripts/#{script}"))
+    end
+
+    fixture = write_sources!(Path.join(root, "priv/unicode"))
+    source_directory = Path.join(root, "priv/unicode/18.0.0-draft")
+    File.rename!(fixture, source_directory)
+    output_directory = Path.join(root, "lib/unicode_security/data")
+    Generator.generate!(source_directory, output_directory)
+    Generator.generate_confusables!(source_directory, output_directory)
+    Generator.generate_manifest!(source_directory, output_directory)
+    root
+  end
+
+  defp run_check(root, script) do
+    elixir = System.find_executable("elixir") || raise "elixir executable not found"
+    beam_directory = Generator |> :code.which() |> List.to_string() |> Path.dirname()
+
+    System.cmd(elixir, ["-pa", beam_directory, Path.join(root, "scripts/#{script}")],
+      cd: root,
+      stderr_to_stdout: true
+    )
   end
 
   defp temporary_directory do

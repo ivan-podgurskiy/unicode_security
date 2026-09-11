@@ -50,6 +50,46 @@ defmodule UnicodeSecurity.UnicodeData.Generator do
     write_output!(output_directory, "confusables.ex", render_confusables(index, values))
   end
 
+  @spec generate_manifest!(Path.t(), Path.t()) :: Path.t()
+  def generate_manifest!(source_directory, output_directory) do
+    lock = read_lock!(source_directory)
+    declarations = Source.sources()
+    Source.verify!(declarations, source_directory, lock)
+
+    sources =
+      declarations
+      |> Enum.sort_by(& &1.name)
+      |> Enum.map(fn declaration ->
+        declaration
+        |> Map.take([:name, :url, :version, :status])
+        |> Map.merge(Map.take(Map.fetch!(lock, declaration.name), [:bytes, :sha256]))
+      end)
+
+    release_status = if Enum.all?(sources, &(&1.status == :final)), do: :final, else: :draft
+
+    source_literals =
+      Enum.map_join(sources, ",\n", fn source ->
+        fields =
+          Enum.map_join([:name, :url, :version, :bytes, :sha256, :status], ",\n", fn key ->
+            "#{key}: #{inspect(Map.fetch!(source, key))}"
+          end)
+
+        "%{#{fields}}"
+      end)
+
+    contents = """
+    defmodule UnicodeSecurity.Data.Manifest do
+      @moduledoc false
+
+      @spec get() :: map()
+      def get, do: %{release_status: #{inspect(release_status)}, sources: [#{source_literals}]}
+    end
+    """
+
+    contents = contents |> Code.format_string!() |> IO.iodata_to_binary() |> Kernel.<>("\n")
+    write_output!(output_directory, "manifest.ex", contents)
+  end
+
   defp write_output!(output_directory, output_name, contents) do
     output_path = Path.join(output_directory, output_name)
     temporary_path = output_path <> ".tmp"
@@ -67,6 +107,13 @@ defmodule UnicodeSecurity.UnicodeData.Generator do
   end
 
   defp verify_sources!(source_directory, source_names \\ @source_names) do
+    lock = read_lock!(source_directory)
+    declarations = Enum.filter(Source.sources(), &(&1.name in source_names))
+    relevant_lock = Map.take(lock, source_names)
+    Source.verify!(declarations, source_directory, relevant_lock)
+  end
+
+  defp read_lock!(source_directory) do
     lock_path = Path.join(Path.dirname(source_directory), "sources.lock")
     {lock, _binding} = Code.eval_file(lock_path)
 
@@ -74,9 +121,7 @@ defmodule UnicodeSecurity.UnicodeData.Generator do
       raise ArgumentError, "Unicode source lock must evaluate to a map"
     end
 
-    declarations = Enum.filter(Source.sources(), &(&1.name in source_names))
-    relevant_lock = Map.take(lock, source_names)
-    Source.verify!(declarations, source_directory, relevant_lock)
+    lock
   end
 
   defp render(decomposition_index, decomposition_values, combining_classes) do
