@@ -65,6 +65,48 @@ defmodule UnicodeSecurity.GeneratorTest do
     end
   end
 
+  # Catches the normal entrypoint writing tables before validating later locked sources.
+  test "generation entrypoint preserves every output when any locked source is invalid" do
+    root = checker_project!()
+    script = Path.join(root, "scripts/generate_unicode_data.exs")
+    File.cp!("scripts/generate_unicode_data.exs", script)
+
+    originals =
+      Map.new(["normalization.ex", "confusables.ex", "manifest.ex"], fn name ->
+        path = Path.join(root, "lib/unicode_security/data/#{name}")
+        contents = File.read!(path) <> "# existing output to preserve\n"
+        File.write!(path, contents)
+        {path, contents}
+      end)
+
+    elixir = System.find_executable("elixir") || raise "elixir executable not found"
+    beam_directory = Generator |> :code.which() |> List.to_string() |> Path.dirname()
+    invocation = "Mix.start(); Code.require_file(#{inspect(script)})"
+
+    for source <- Source.sources() do
+      source_path = Path.join(root, "priv/unicode/18.0.0-draft/#{source.name}")
+      original_source = File.read!(source_path)
+      File.write!(source_path, original_source <> "# tampered\n")
+
+      {output, status} =
+        System.cmd(elixir, ["-pa", beam_directory, "-e", invocation],
+          cd: root,
+          stderr_to_stdout: true
+        )
+
+      assert status != 0
+      assert output =~ "byte-size mismatch for #{source.name}"
+
+      for {path, contents} <- originals do
+        assert File.read!(path) == contents,
+               "#{Path.basename(path)} was rewritten despite invalid #{source.name}"
+      end
+
+      refute output =~ "generated lib/"
+      File.write!(source_path, original_source)
+    end
+  end
+
   test "offline checker verifies all locked sources before accepting generated files" do
     root = checker_project!()
     File.write!(Path.join(root, "priv/unicode/18.0.0-draft/NormalizationTest.txt"), "tampered\n")
