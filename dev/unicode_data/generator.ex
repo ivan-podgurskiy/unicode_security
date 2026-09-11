@@ -32,7 +32,26 @@ defmodule UnicodeSecurity.UnicodeData.Generator do
     contents =
       render(decomposition_index, decomposition_values, packed_combining_classes)
 
-    output_path = Path.join(output_directory, @output_name)
+    write_output!(output_directory, @output_name, contents)
+  end
+
+  @spec generate_confusables!(Path.t(), Path.t()) :: Path.t()
+  def generate_confusables!(source_directory, output_directory) do
+    verify_sources!(source_directory, ["confusables.txt"])
+
+    {index, values} =
+      source_directory
+      |> Path.join("confusables.txt")
+      |> File.read!()
+      |> Parser.confusables!()
+      |> Enum.sort_by(&elem(&1, 0))
+      |> Packer.mapping()
+
+    write_output!(output_directory, "confusables.ex", render_confusables(index, values))
+  end
+
+  defp write_output!(output_directory, output_name, contents) do
+    output_path = Path.join(output_directory, output_name)
     temporary_path = output_path <> ".tmp"
 
     File.mkdir_p!(output_directory)
@@ -47,7 +66,7 @@ defmodule UnicodeSecurity.UnicodeData.Generator do
     output_path
   end
 
-  defp verify_sources!(source_directory) do
+  defp verify_sources!(source_directory, source_names \\ @source_names) do
     lock_path = Path.join(Path.dirname(source_directory), "sources.lock")
     {lock, _binding} = Code.eval_file(lock_path)
 
@@ -55,8 +74,8 @@ defmodule UnicodeSecurity.UnicodeData.Generator do
       raise ArgumentError, "Unicode source lock must evaluate to a map"
     end
 
-    declarations = Enum.filter(Source.sources(), &(&1.name in @source_names))
-    relevant_lock = Map.take(lock, @source_names)
+    declarations = Enum.filter(Source.sources(), &(&1.name in source_names))
+    relevant_lock = Map.take(lock, source_names)
     Source.verify!(declarations, source_directory, relevant_lock)
   end
 
@@ -116,6 +135,49 @@ defmodule UnicodeSecurity.UnicodeData.Generator do
           codepoint > last -> lookup_range(ranges, codepoint, default, middle + 1, high)
           true -> value
         end
+      end
+    end
+    """
+
+    source
+    |> Code.format_string!()
+    |> IO.iodata_to_binary()
+    |> Kernel.<>("\n")
+  end
+
+  defp render_confusables(index, values) do
+    source = """
+    defmodule UnicodeSecurity.Data.Confusables do
+      @moduledoc false
+
+      @record_size 10
+      @index Base.decode64!(#{encoded_literal(index)})
+      @values Base.decode64!(#{encoded_literal(values)})
+
+      @spec mapping(non_neg_integer()) :: [non_neg_integer()] | nil
+      def mapping(codepoint), do: lookup_mapping(@index, @values, codepoint)
+
+      defp lookup_mapping(index, values, codepoint) do
+        lookup_mapping(index, values, codepoint, 0, div(byte_size(index), @record_size) - 1)
+      end
+
+      defp lookup_mapping(_index, _values, _codepoint, low, high) when low > high, do: nil
+
+      defp lookup_mapping(index, values, codepoint, low, high) do
+        middle = div(low + high, 2)
+
+        <<matched::32, offset::32, count::16>> =
+          :binary.part(index, middle * @record_size, @record_size)
+
+        cond do
+          codepoint < matched -> lookup_mapping(index, values, codepoint, low, middle - 1)
+          codepoint > matched -> lookup_mapping(index, values, codepoint, middle + 1, high)
+          true -> unpack_values(values, offset, count)
+        end
+      end
+
+      defp unpack_values(values, offset, count) do
+        for <<value::32 <- :binary.part(values, offset * 4, count * 4)>>, do: value
       end
     end
     """

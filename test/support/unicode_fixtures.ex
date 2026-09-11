@@ -20,6 +20,20 @@ defmodule UnicodeSecurity.Test.UnicodeFixtures do
     end)
   end
 
+  def confusable_rows do
+    Path.expand("../../priv/unicode/18.0.0-draft/confusables.txt", __DIR__)
+    |> File.stream!()
+    |> Stream.with_index(1)
+    |> Stream.map(fn {line, number} ->
+      {line |> String.split("#", parts: 2) |> hd() |> String.trim(), number}
+    end)
+    |> Stream.reject(fn {line, _number} -> line == "" end)
+    |> Stream.map(fn {line, number} ->
+      [source, target, "MA"] = line |> String.split(";") |> Enum.map(&String.trim/1)
+      {number, String.to_integer(source, 16), decode_hex_sequence(target)}
+    end)
+  end
+
   def golden_corpus do
     [
       "",

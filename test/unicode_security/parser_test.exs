@@ -4,6 +4,46 @@ defmodule UnicodeSecurity.ParserTest do
   alias UnicodeSecurity.UnicodeData.Packer
   alias UnicodeSecurity.UnicodeData.Parser
 
+  # Catches dropped target scalars, silently overwritten duplicates, and lax MA parsing.
+  test "parses MA confusables with scalar and multi-scalar targets" do
+    input = "# header\r\n0430 ; 0061 ; MA # Cyrillic a\r\n006D ; 0072 006E ; MA\n"
+    assert Parser.confusables!(input) == %{0x0430 => [0x0061], 0x006D => [0x0072, 0x006E]}
+    assert Parser.confusables!("# comment only\n") == %{}
+  end
+
+  test "rejects duplicate confusable sources even with identical targets" do
+    for target <- ["0061", "0062"] do
+      assert_raise ArgumentError, ~r/duplicate/, fn ->
+        Parser.confusables!("0430 ; 0061 ; MA\n0430 ; #{target} ; MA\n")
+      end
+    end
+  end
+
+  test "rejects every legacy mapping type and unknown or missing mapping types" do
+    for type <- ["SL", "SA", "ML", "", "ma", "UNKNOWN", "MA MA"] do
+      assert_raise ArgumentError, fn -> Parser.confusables!("0430 ; 0061 ; #{type}") end
+    end
+  end
+
+  test "rejects malformed confusable fields and invalid source or target scalars" do
+    for line <- [
+          "0430 ; 0061",
+          "0430 ; 0061 ; MA ; extra",
+          "; 0061 ; MA",
+          "0430 ; ; MA",
+          "0430 0431 ; 0061 ; MA",
+          "D800 ; 0061 ; MA",
+          "110000 ; 0061 ; MA",
+          "0430 ; DFFF ; MA",
+          "0430 ; 0061 110000 ; MA",
+          "0430 ; 006a ; MA",
+          "0430..0431 ; 0061 ; MA",
+          "0430 ; 61 ; MA"
+        ] do
+      assert_raise ArgumentError, fn -> Parser.confusables!(line) end
+    end
+  end
+
   test "parses canonical decompositions and excludes compatibility mappings" do
     input =
       "00C0;LATIN CAPITAL LETTER A WITH GRAVE;Lu;0;L;0041 0300;;;;N;;;;00E0;\n" <>

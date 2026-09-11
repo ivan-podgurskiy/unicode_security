@@ -17,10 +17,20 @@ defmodule UnicodeSecurity.Normalization do
   def nfd(input) do
     input
     |> Utf8.decode!()
-    |> Enum.flat_map(fn {scalar, _offset} -> decompose(scalar) end)
-    |> reorder([], [])
+    |> Enum.map(fn {scalar, _offset} -> scalar end)
+    |> nfd_scalars()
     |> Enum.map(fn scalar -> <<scalar::utf8>> end)
     |> IO.iodata_to_binary()
+  end
+
+  # Internal pipeline entry point: callers supply already validated Unicode scalars.
+  # Generated expansions are not subject to the original binary input byte limit.
+  @doc false
+  @spec nfd_scalars([0..0x10FFFF]) :: [0..0x10FFFF]
+  def nfd_scalars(scalars) do
+    scalars
+    |> Enum.flat_map(&decompose/1)
+    |> reorder([], [])
   end
 
   defp decompose(scalar) when scalar >= @s_base and scalar < @s_base + @s_count do

@@ -4,6 +4,28 @@ defmodule UnicodeSecurity.UnicodeData.Parser do
   @type codepoint :: 0..0x10FFFF
   @type range_record :: {codepoint(), codepoint(), non_neg_integer()}
 
+  @spec confusables!(binary()) :: %{codepoint() => [codepoint()]}
+  def confusables!(input) when is_binary(input) do
+    input
+    |> data_lines()
+    |> Enum.reduce(%{}, fn line, mappings ->
+      case line |> String.split(";", trim: false) |> Enum.map(&String.trim/1) do
+        [source, target, "MA"] when target != "" ->
+          scalar = codepoint!(source, :confusables)
+          mapping = target |> String.split() |> Enum.map(&codepoint!(&1, :confusables))
+
+          if Map.has_key?(mappings, scalar) do
+            raise ArgumentError, "duplicate confusable source: #{hex(scalar)}"
+          end
+
+          Map.put(mappings, scalar, mapping)
+
+        _fields ->
+          raise ArgumentError, "malformed MA confusable record: #{inspect(line)}"
+      end
+    end)
+  end
+
   @spec unicode_data!(binary()) :: %{codepoint() => [codepoint()]}
   def unicode_data!(input) when is_binary(input) do
     input

@@ -5,6 +5,41 @@ defmodule UnicodeSecurity.GeneratorTest do
   alias UnicodeSecurity.UnicodeData.Generator
   alias UnicodeSecurity.UnicodeData.Source
 
+  # Catches unsorted packed indices, dropped multi-scalar values, misses, and nondeterminism.
+  test "generates deterministic confusable mappings with working packed lookups" do
+    root = temporary_directory()
+    source_directory = write_sources!(root)
+    first_path = Generator.generate_confusables!(source_directory, Path.join(root, "first"))
+    second_path = Generator.generate_confusables!(source_directory, Path.join(root, "second"))
+
+    assert File.read!(first_path) == File.read!(second_path)
+
+    verification = """
+    [{UnicodeSecurity.Data.Confusables, _}] = Code.compile_file(#{inspect(first_path)})
+    nil = UnicodeSecurity.Data.Confusables.mapping(0)
+    nil = UnicodeSecurity.Data.Confusables.mapping(0x006E)
+    nil = UnicodeSecurity.Data.Confusables.mapping(0x10FFFF)
+    [0x0072, 0x006E] = UnicodeSecurity.Data.Confusables.mapping(0x006D)
+    [0x0061] = UnicodeSecurity.Data.Confusables.mapping(0x0430)
+    [0x0041, 0x0300] = UnicodeSecurity.Data.Confusables.mapping(0x1200)
+    """
+
+    elixir = System.find_executable("elixir") || raise "elixir executable not found"
+    assert {"", 0} = System.cmd(elixir, ["-e", verification], stderr_to_stdout: true)
+  end
+
+  test "refuses confusable generation when the locked source changes" do
+    root = temporary_directory()
+    source_directory = write_sources!(root)
+    File.write!(Path.join(source_directory, "confusables.txt"), "0430 ; 0062 ; MA\n")
+
+    assert_raise ArgumentError, fn ->
+      Generator.generate_confusables!(source_directory, Path.join(root, "output"))
+    end
+
+    refute File.exists?(Path.join(root, "output/confusables.ex"))
+  end
+
   test "generates deterministic normalization tables" do
     root = temporary_directory()
     source_directory = write_sources!(root)
@@ -66,6 +101,11 @@ defmodule UnicodeSecurity.GeneratorTest do
       "0000..02FF ; 0 # default\n0300..0314 ; 230 # Mn\n0315 ; 232 # Mn\n"
     )
 
+    File.write!(
+      Path.join(source_directory, "confusables.txt"),
+      "1200 ; 0041 0300 ; MA\n0430 ; 0061 ; MA\n006D ; 0072 006E ; MA\n"
+    )
+
     write_lock!(root, source_directory)
     source_directory
   end
@@ -74,7 +114,7 @@ defmodule UnicodeSecurity.GeneratorTest do
     declarations =
       Enum.filter(
         Source.sources(),
-        &(&1.name in ["UnicodeData.txt", "DerivedCombiningClass.txt"])
+        &(&1.name in ["UnicodeData.txt", "DerivedCombiningClass.txt", "confusables.txt"])
       )
 
     lock = Source.lock!(declarations, source_directory)
