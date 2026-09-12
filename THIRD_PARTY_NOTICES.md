@@ -2,14 +2,62 @@
 
 ## Unicode data
 
-This package is designed to include data derived from the Unicode Character
+This package includes generated tables derived from the Unicode Character
 Database and Unicode Technical Standard #39, "Unicode Security Mechanisms."
 Those data and specifications are copyright Unicode, Inc. and are distributed
-under the Unicode License v3. No Unicode data files are included in this initial
-package scaffold.
+under the Unicode License v3 reproduced below. The package includes derived
+normalization and confusables tables and a provenance manifest. Raw source files
+and the normalization conformance corpus are development inputs and are not
+included in the Hex package.
+
+Milestone 0 pins **draft Unicode 18.0.0** and targets UTS #39 revision 34.
+`UnicodeSecurity.data_manifest/0` records the precise source URLs, versions,
+draft statuses, byte sizes, and SHA-256 hashes. This attribution does not imply
+that Unicode, Inc. endorses the package or that the draft data is final.
 
 The referenced materials and license are available from:
 
-- https://www.unicode.org/reports/tr39/
-- https://www.unicode.org/Public/UCD/latest/
-- https://www.unicode.org/license.txt
+- [UTS #39 revision 34](https://www.unicode.org/reports/tr39/tr39-34.html)
+- [Unicode 18.0.0 data](https://www.unicode.org/Public/18.0.0/ucd/)
+- [Draft security data](https://www.unicode.org/Public/draft/security/)
+- [Unicode License v3](https://www.unicode.org/license.txt)
+
+## Unicode License v3
+
+```text
+UNICODE LICENSE V3
+
+COPYRIGHT AND PERMISSION NOTICE
+
+Copyright © 1991-2026 Unicode, Inc.
+
+NOTICE TO USER: Carefully read the following legal agreement. BY
+DOWNLOADING, INSTALLING, COPYING OR OTHERWISE USING DATA FILES, AND/OR
+SOFTWARE, YOU UNEQUIVOCALLY ACCEPT, AND AGREE TO BE BOUND BY, ALL OF THE
+TERMS AND CONDITIONS OF THIS AGREEMENT. IF YOU DO NOT AGREE, DO NOT
+DOWNLOAD, INSTALL, COPY, DISTRIBUTE OR USE THE DATA FILES OR SOFTWARE.
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of data files and any associated documentation (the "Data Files") or
+software and any associated documentation (the "Software") to deal in the
+Data Files or Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, and/or sell
+copies of the Data Files or Software, and to permit persons to whom the
+Data Files or Software are furnished to do so, provided that either (a)
+this copyright and permission notice appear with all copies of the Data
+Files or Software, or (b) this copyright and permission notice appear in
+associated Documentation.
+THE DATA FILES AND SOFTWARE ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
+KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF
+THIRD PARTY RIGHTS.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS INCLUDED IN THIS NOTICE
+BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT OR CONSEQUENTIAL DAMAGES,
+OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THE DATA
+FILES OR SOFTWARE.
+Except as contained in this notice, the name of a copyright holder shall
+not be used in advertising or otherwise to promote the sale, use or other
+dealings in these Data Files or Software without prior written
+authorization of the copyright holder.
+```

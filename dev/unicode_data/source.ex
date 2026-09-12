@@ -164,7 +164,7 @@ defmodule UnicodeSecurity.UnicodeData.Source do
   end
 
   defp http_options("https://" <> _rest) do
-    hostname_match = apply(:public_key, :pkix_verify_hostname_match_fun, [:https])
+    hostname_match = :public_key.pkix_verify_hostname_match_fun(:https)
 
     [
       autoredirect: true,
@@ -172,7 +172,7 @@ defmodule UnicodeSecurity.UnicodeData.Source do
       timeout: 120_000,
       ssl: [
         verify: :verify_peer,
-        cacerts: apply(:public_key, :cacerts_get, []),
+        cacerts: :public_key.cacerts_get(),
         depth: 4,
         customize_hostname_check: [match_fun: hostname_match]
       ]
@@ -237,17 +237,8 @@ defmodule UnicodeSecurity.UnicodeData.Source do
 
   defp valid_unicode_data_record?(record) do
     case record do
-      [code, _name, _category, _combining_class, _bidi_class, decomposition | rest]
-      when length(rest) == 9 ->
-        [_, _, _, _, _, _, simple_uppercase, simple_lowercase, simple_titlecase] = rest
-
-        unicode_scalar?(code) and valid_decomposition?(decomposition) and
-          Enum.all?([simple_uppercase, simple_lowercase, simple_titlecase], fn mapping ->
-            mapping == "" or unicode_scalar?(mapping)
-          end)
-
-      _malformed_fields ->
-        false
+      [code | _fields] ->
+        unicode_scalar?(code) and valid_unicode_data_mappings?(record)
     end
   end
 
@@ -264,13 +255,16 @@ defmodule UnicodeSecurity.UnicodeData.Source do
        ) do
     length(first) == 15 and length(last) == 15 and surrogate_code_point?(first_code) and
       surrogate_code_point?(last_code) and code_point!(first_code) <= code_point!(last_code) and
-      String.starts_with?(last_name, "<") and String.ends_with?(last_name, ", Last>") and
-      String.replace_suffix(first_name, "First>", "") ==
-        String.replace_suffix(last_name, "Last>", "") and
+      sentinel_names_match?(first_name, last_name) and
       first_properties == last_properties and valid_unicode_data_mappings?(first)
   end
 
   defp valid_surrogate_pair?(_first, _last), do: false
+
+  defp sentinel_names_match?(first, last) do
+    String.starts_with?(last, "<") and String.ends_with?(last, ", Last>") and
+      String.replace_suffix(first, "First>", "") == String.replace_suffix(last, "Last>", "")
+  end
 
   defp valid_unicode_data_mappings?([
          _code,

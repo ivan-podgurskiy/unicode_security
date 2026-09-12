@@ -12,7 +12,7 @@ defmodule UnicodeSecurity.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
       name: "UnicodeSecurity",
-      description: "Unicode identifier spoofing and ambiguity detection for Elixir.",
+      description: "Pinned Unicode normalization and confusable comparison keys for Elixir.",
       package: package(),
       source_url: @source_url,
       docs: docs(),
@@ -39,7 +39,7 @@ defmodule UnicodeSecurity.MixProject do
   defp deps do
     [
       {:stream_data, "~> 1.1", only: [:dev, :test]},
-      {:ex_doc, "~> 0.37.0", only: :dev, runtime: false},
+      {:ex_doc, "~> 0.37", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
     ]
@@ -59,7 +59,12 @@ defmodule UnicodeSecurity.MixProject do
       main: "UnicodeSecurity",
       source_ref: "v#{@version}",
       source_url: @source_url,
-      extras: ["README.md", "CHANGELOG.md", "LICENSE", "THIRD_PARTY_NOTICES.md"]
+      extras: [
+        "README.md",
+        "CHANGELOG.md",
+        {"LICENSE", title: "License"},
+        "THIRD_PARTY_NOTICES.md"
+      ]
     ]
   end
 end

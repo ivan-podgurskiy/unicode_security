@@ -96,4 +96,74 @@ defmodule UnicodeSecurity.ParserTest do
     assert index == <<0x00C0::32, 0::32, 2::16>>
     assert values == <<0x0041::32, 0x0300::32>>
   end
+
+  test "rejects malformed, duplicate and unpaired UnicodeData records" do
+    record = "0041;A;Lu;0;L;;;;;N;;;;;\n"
+
+    for input <- ["0041;A", record <> record, "D800;<High Surrogate, First>;Cs;0;L;;;;;N;;;;;\n"] do
+      assert_raise ArgumentError, fn -> Parser.unicode_data!(input) end
+    end
+
+    for decomposition <- ["<font>", "<bad 0041", "<> 0041"] do
+      assert_raise ArgumentError, fn ->
+        Parser.unicode_data!("0041;A;Lu;0;L;#{decomposition};;;;N;;;;;\n")
+      end
+    end
+  end
+
+  test "accepts surrogate sentinels without emitting scalar mappings" do
+    input =
+      "D800;<High Surrogate, First>;Cs;0;L;;;;;N;;;;;\n" <>
+        "DB7F;<High Surrogate, Last>;Cs;0;L;;;;;N;;;;;\n"
+
+    assert Parser.unicode_data!(input) == %{}
+  end
+
+  test "coalesces only adjacent equal ranges and rejects malformed ranges" do
+    assert Parser.ranges!("0301 ; 230\n0300 ; 230", :integer) == [{0x0300, 0x0301, 230}]
+
+    for input <- [
+          "0300",
+          "0300 ; 1 ; 2",
+          "0301..0300 ; 1",
+          "0300..0301..0302 ; 1",
+          "0300..0301 ; 1\n0301 ; 2",
+          "0300 ; -1",
+          "0300 ; 65536",
+          "0300 ; 1x"
+        ] do
+      assert_raise ArgumentError, fn -> Parser.ranges!(input, :integer) end
+    end
+  end
+
+  test "rejects lossy packed fields, invalid scalars and unordered records" do
+    for ranges <- [
+          [{2, 1, 0}],
+          [{1, 1, -1}],
+          [{1, 1, 65_536}],
+          [{0xD800, 0xD800, 0}],
+          [{1, 2, 0}, {2, 3, 0}]
+        ] do
+      assert_raise ArgumentError, fn -> Packer.ranges(ranges) end
+    end
+
+    for mappings <- [
+          [{1, []}],
+          [{1, :invalid}],
+          [{1, List.duplicate(1, 65_536)}],
+          [{1, [0xD800]}],
+          [{2, [1]}, {1, [1]}]
+        ] do
+      assert_raise ArgumentError, fn -> Packer.mapping(mappings) end
+    end
+  end
+
+  test "mapping index records preserve maximal fields and reject overflow before truncation" do
+    assert Packer.mapping_index!(0x10FFFF, 0xFFFFFFFF, 0xFFFF) ==
+             <<0x10FFFF::32, 0xFFFFFFFF::32, 0xFFFF::16>>
+
+    for {offset, count} <- [{0x100000000, 1}, {-1, 1}, {0, 0}, {0, 65_536}] do
+      assert_raise ArgumentError, fn -> Packer.mapping_index!(1, offset, count) end
+    end
+  end
 end

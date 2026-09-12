@@ -165,7 +165,99 @@ defmodule UnicodeSecurity.SourceTest do
     %{name: "UnicodeData.txt", url: url, version: "18.0.0", status: :draft}
   end
 
-  defp serve_once(body) do
+  test "rejects lock entry mismatch and invalid source declarations before writes" do
+    directory = temporary_directory()
+    source = %{name: "sample.txt", version: "18.0.0", status: :draft, url: "unused"}
+    assert_raise ArgumentError, fn -> Source.verify!([source], directory, %{}) end
+
+    for sources <- [
+          [%{source | version: "17.0.0"}],
+          [%{source | status: :final}],
+          [%{source | name: "../sample.txt"}],
+          [source, source],
+          [%{source | url: nil}]
+        ] do
+      assert_raise ArgumentError, fn -> Source.fetch!(sources, directory) end
+    end
+
+    refute File.exists?(directory)
+  end
+
+  test "restores the previous directory if staged installation fails" do
+    directory = temporary_directory()
+    File.mkdir_p!(directory)
+    File.write!(Path.join(directory, "existing.txt"), "keep")
+
+    assert_raise File.RenameError, fn ->
+      Source.install_staged!(directory <> "-missing", directory)
+    end
+
+    assert File.read!(Path.join(directory, "existing.txt")) == "keep"
+  end
+
+  test "rejects HTTP errors and preserves existing sources" do
+    {url, server} = serve_once("not found", "404 Not Found")
+    directory = temporary_directory()
+
+    assert_raise RuntimeError, ~r/HTTP 404/, fn ->
+      Source.fetch!([unicode_data_source(url)], directory)
+    end
+
+    Task.await(server)
+    refute File.exists?(directory)
+  end
+
+  test "HTTPS acquisition fails closed when the endpoint is unavailable" do
+    directory = temporary_directory()
+    source = unicode_data_source("https://127.0.0.1:1/18.0.0/ucd/UnicodeData.txt")
+    assert_raise RuntimeError, ~r/failed to fetch/, fn -> Source.fetch!([source], directory) end
+    refute File.exists?(directory)
+  end
+
+  test "checks version headers for security and conformance sources" do
+    for body <- ["# Version: 18.0.0\n", "# Version: 17.0.0\n"] do
+      {url, server} = serve_once(body)
+      source = %{unicode_data_source(url) | name: "confusables.txt"}
+      directory = temporary_directory()
+
+      if body == "# Version: 18.0.0\n" do
+        lock = Source.fetch!([source], directory)
+        assert :ok = Source.verify!([source], directory, lock)
+      else
+        assert_raise RuntimeError, ~r/version validation failed/, fn ->
+          Source.fetch!([source], directory)
+        end
+
+        refute File.exists?(directory)
+      end
+
+      Task.await(server)
+    end
+  end
+
+  test "rejects incomplete, mismatched and malformed surrogate sentinels" do
+    first = "D800;<High Surrogate, First>;Cs;0;L;;;;;N;;;;;\n"
+
+    for records <- [
+          "0041;A",
+          first,
+          first <> "0041;A;Lu;0;L;;;;;N;;;;;\n",
+          first <> "DB7F;<Other Surrogate, Last>;Cs;0;L;;;;;N;;;;;\n",
+          "XXXX;<High Surrogate, First>;Cs;0;L;;;;;N;;;;;\n"
+        ] do
+      {url, server} = serve_once(records)
+      directory = temporary_directory()
+
+      assert_raise RuntimeError, ~r/invalid UnicodeData records/, fn ->
+        Source.fetch!([unicode_data_source(url)], directory)
+      end
+
+      Task.await(server)
+      refute File.exists?(directory)
+    end
+  end
+
+  defp serve_once(body, status \\ "200 OK") do
     {:ok, listener} =
       :gen_tcp.listen(0, [:binary, active: false, reuseaddr: true, ip: {127, 0, 0, 1}])
 
@@ -177,7 +269,7 @@ defmodule UnicodeSecurity.SourceTest do
         {:ok, _request} = :gen_tcp.recv(socket, 0, 5_000)
 
         response = [
-          "HTTP/1.1 200 OK\r\ncontent-length: ",
+          "HTTP/1.1 #{status}\r\ncontent-length: ",
           Integer.to_string(byte_size(body)),
           "\r\nconnection: close\r\n\r\n",
           body

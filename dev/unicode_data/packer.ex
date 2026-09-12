@@ -25,18 +25,10 @@ defmodule UnicodeSecurity.UnicodeData.Packer do
         end
 
         count = length(mapping)
-
-        if count > @maximum_count do
-          raise ArgumentError, "mapping for #{hex(codepoint)} exceeds 65,535 values"
-        end
-
-        if offset > @maximum_offset do
-          raise ArgumentError, "mapping offset exceeds 0xFFFFFFFF"
-        end
+        index_record = mapping_index!(codepoint, offset, count)
 
         Enum.each(mapping, &scalar!/1)
 
-        index_record = <<codepoint::32, offset::32, count::16>>
         value_records = Enum.map(mapping, &<<&1::32>>)
 
         {[index_record | index], [value_records | values], offset + count, codepoint}
@@ -44,6 +36,22 @@ defmodule UnicodeSecurity.UnicodeData.Packer do
 
     {index |> Enum.reverse() |> IO.iodata_to_binary(),
      values |> Enum.reverse() |> IO.iodata_to_binary()}
+  end
+
+  @doc false
+  @spec mapping_index!(non_neg_integer(), non_neg_integer(), pos_integer()) :: binary()
+  def mapping_index!(codepoint, offset, count) do
+    scalar!(codepoint)
+
+    unless is_integer(offset) and offset in 0..@maximum_offset do
+      raise ArgumentError, "mapping offset must fit in 32 bits"
+    end
+
+    unless is_integer(count) and count in 1..@maximum_count do
+      raise ArgumentError, "mapping for #{hex(codepoint)} must contain 1 to 65,535 values"
+    end
+
+    <<codepoint::32, offset::32, count::16>>
   end
 
   defp validate_ranges!(ranges) do

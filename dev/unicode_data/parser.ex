@@ -14,16 +14,20 @@ defmodule UnicodeSecurity.UnicodeData.Parser do
           scalar = codepoint!(source, :confusables)
           mapping = target |> String.split() |> Enum.map(&codepoint!(&1, :confusables))
 
-          if Map.has_key?(mappings, scalar) do
-            raise ArgumentError, "duplicate confusable source: #{hex(scalar)}"
-          end
-
-          Map.put(mappings, scalar, mapping)
+          put_mapping!(mappings, scalar, mapping)
 
         _fields ->
           raise ArgumentError, "malformed MA confusable record: #{inspect(line)}"
       end
     end)
+  end
+
+  defp put_mapping!(mappings, scalar, mapping) do
+    if Map.has_key?(mappings, scalar) do
+      raise ArgumentError, "duplicate confusable source: #{hex(scalar)}"
+    end
+
+    Map.put(mappings, scalar, mapping)
   end
 
   @spec unicode_data!(binary()) :: %{codepoint() => [codepoint()]}
@@ -109,11 +113,14 @@ defmodule UnicodeSecurity.UnicodeData.Parser do
   defp surrogate_pair?(first, last) do
     first.category == "Cs" and last.category == "Cs" and
       last.codepoint in 0xD800..0xDFFF and first.codepoint <= last.codepoint and
-      String.starts_with?(first.name, "<") and String.ends_with?(first.name, ", First>") and
-      String.starts_with?(last.name, "<") and String.ends_with?(last.name, ", Last>") and
-      String.replace_suffix(first.name, "First>", "") ==
-        String.replace_suffix(last.name, "Last>", "") and
+      sentinel_names_match?(first.name, last.name) and
       first.fields == last.fields and first.decomposition == ""
+  end
+
+  defp sentinel_names_match?(first, last) do
+    String.starts_with?(first, "<") and String.ends_with?(first, ", First>") and
+      String.starts_with?(last, "<") and String.ends_with?(last, ", Last>") and
+      String.replace_suffix(first, "First>", "") == String.replace_suffix(last, "Last>", "")
   end
 
   defp canonical_decomposition!(""), do: nil

@@ -5,6 +5,19 @@ defmodule UnicodeSecurity.GeneratorTest do
   alias UnicodeSecurity.UnicodeData.Generator
   alias UnicodeSecurity.UnicodeData.Source
 
+  test "rejects a non-map source lock before generating output" do
+    root = temporary_directory()
+    source_directory = write_sources!(root)
+    File.write!(Path.join(root, "sources.lock"), "[]\n")
+    output = Path.join(root, "output")
+
+    assert_raise ArgumentError, ~r/source lock must evaluate to a map/, fn ->
+      Generator.generate_manifest!(source_directory, output)
+    end
+
+    refute File.exists?(output)
+  end
+
   # Catches nonportable provenance, omitted sources, and nondeterministic generation.
   test "generates deterministic literal manifest from all declarations and locked bytes" do
     root = temporary_directory()
@@ -80,7 +93,7 @@ defmodule UnicodeSecurity.GeneratorTest do
       end)
 
     elixir = System.find_executable("elixir") || raise "elixir executable not found"
-    beam_directory = Generator |> :code.which() |> List.to_string() |> Path.dirname()
+    beam_directory = Application.app_dir(:unicode_security, "ebin")
     invocation = "Mix.start(); Code.require_file(#{inspect(script)})"
 
     for source <- Source.sources() do
@@ -264,7 +277,7 @@ defmodule UnicodeSecurity.GeneratorTest do
 
   defp run_check(root, script) do
     elixir = System.find_executable("elixir") || raise "elixir executable not found"
-    beam_directory = Generator |> :code.which() |> List.to_string() |> Path.dirname()
+    beam_directory = Application.app_dir(:unicode_security, "ebin")
 
     System.cmd(elixir, ["-pa", beam_directory, Path.join(root, "scripts/#{script}")],
       cd: root,

@@ -2,8 +2,9 @@ defmodule UnicodeSecurity.ConfusablesTest do
   use ExUnit.Case, async: true
   use ExUnitProperties
 
-  alias UnicodeSecurity.{InvalidInputError, Normalization}
   alias UnicodeSecurity.Data.Confusables
+  alias UnicodeSecurity.InvalidInputError
+  alias UnicodeSecurity.Normalization
   alias UnicodeSecurity.Test.UnicodeFixtures
 
   # Breaks: removing the Cyrillic mapping, either NFD pass, or scalar fallback;

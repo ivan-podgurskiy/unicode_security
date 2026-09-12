@@ -1,8 +1,8 @@
 defmodule UnicodeSecurity.UnicodeData.Generator do
   @moduledoc false
 
-  alias UnicodeSecurity.UnicodeData.Parser
   alias UnicodeSecurity.UnicodeData.Packer
+  alias UnicodeSecurity.UnicodeData.Parser
   alias UnicodeSecurity.UnicodeData.Source
 
   @source_names ["UnicodeData.txt", "DerivedCombiningClass.txt"]

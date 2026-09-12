@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / Elixir ${{ matrix.elixir }} / OTP ${{ matrix.otp }}
+    runs-on: ${{ matrix.os }}
+    # Compatibility jobs do not compile development-only documentation tools.
+    env:
+      MIX_ENV: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            elixir: '1.14'
+            otp: '25'
+          - os: ubuntu-latest
+            elixir: '1.17'
+            otp: '26'
+          - os: ubuntu-latest
+            elixir: '1.18'
+            otp: '27'
+          - os: ubuntu-latest
+            elixir: '1.19'
+            otp: '28'
+          - os: ubuntu-latest
+            elixir: '1.20'
+            otp: '29'
+            quality: true
+          - os: macos-latest
+            elixir: '1.20'
+            otp: '29'
+          - os: windows-latest
+            elixir: '1.20'
+            otp: '29'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: ${{ matrix.elixir }}
+          otp-version: ${{ matrix.otp }}
+      - uses: actions/cache@v6
+        with:
+          path: |
+            deps
+            _build
+            priv/plts
+          key: mix-${{ runner.os }}-${{ runner.arch }}-${{ matrix.elixir }}-${{ matrix.otp }}-${{ hashFiles('mix.lock', 'mix.exs') }}
+      - run: mix deps.get
+      - run: mix compile --warnings-as-errors
+      - name: Verify vendored Unicode fixtures
+        run: mix run scripts/fetch_unicode_data.exs
+      - name: Reject upstream source drift
+        run: git diff --exit-code -- priv/unicode/sources.lock
+      - run: mix test --warnings-as-errors
+      - if: matrix.quality
+        run: mix test --cover --warnings-as-errors
+      - if: matrix.quality
+        run: mix format --check-formatted
+      - if: matrix.quality
+        run: mix run scripts/check_generated.exs
+      - if: matrix.quality
+        run: mix credo --strict
+        env:
+          MIX_ENV: dev
+      - if: matrix.quality
+        run: mix dialyzer --format github
+        env:
+          MIX_ENV: dev
+      - if: matrix.quality
+        run: mix docs --warnings-as-errors
+        env:
+          MIX_ENV: dev
+      - if: matrix.quality
+        run: mix hex.build
+        env:
+          MIX_ENV: dev
+      - if: matrix.quality
+        run: mix run bench/milestone_0.exs

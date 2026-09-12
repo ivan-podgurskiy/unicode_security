@@ -30,7 +30,7 @@ defmodule UnicodeSecurity.MetadataTest do
 
   # A consumer must need only compiled runtime modules, without raw source files.
   test "metadata works in an isolated runtime without the source tree" do
-    beam_directory = UnicodeSecurity |> :code.which() |> List.to_string() |> Path.dirname()
+    beam_directory = Application.app_dir(:unicode_security, "ebin")
     elixir = System.find_executable("elixir") || raise "elixir executable not found"
 
     verification = """
