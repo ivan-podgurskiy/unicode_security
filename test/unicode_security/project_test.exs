@@ -48,4 +48,50 @@ defmodule UnicodeSecurity.ProjectTest do
       assert function_exported?(UnicodeSecurity, name, arity)
     end
   end
+
+  test "Windows checkout preserves the exact bytes of vendored Unicode inputs" do
+    assert_checkout_bytes(Path.wildcard("priv/unicode/18.0.0-draft/*"))
+  end
+
+  test "Windows checkout preserves LF bytes of generated runtime modules" do
+    assert_checkout_bytes(Path.wildcard("lib/unicode_security/data/*.ex"))
+  end
+
+  defp assert_checkout_bytes(paths) do
+    assert paths != []
+    suffix = :crypto.strong_rand_bytes(12) |> Base.url_encode64(padding: false)
+    directory = Path.join(System.tmp_dir!(), "unicode-security-checkout-#{suffix}")
+    on_exit(fn -> File.rm_rf!(directory) end)
+    assert {"", 0} = System.cmd("git", ["init", "--quiet", directory], stderr_to_stdout: true)
+
+    if File.regular?(".gitattributes") do
+      File.cp!(".gitattributes", Path.join(directory, ".gitattributes"))
+    end
+
+    for path <- paths do
+      File.mkdir_p!(Path.dirname(Path.join(directory, path)))
+      File.cp!(path, Path.join(directory, path))
+      original = File.read!(path)
+
+      assert {object, 0} =
+               System.cmd("git", ["hash-object", "-w", "--no-filters", path], cd: directory)
+
+      assert {checkout, 0} =
+               System.cmd(
+                 "git",
+                 [
+                   "-c",
+                   "core.autocrlf=true",
+                   "cat-file",
+                   "--filters",
+                   "--path=#{path}",
+                   String.trim(object)
+                 ],
+                 cd: directory
+               )
+
+      assert :crypto.hash(:sha256, checkout) == :crypto.hash(:sha256, original),
+             "Windows checkout changed the pinned bytes of #{path}"
+    end
+  end
 end
