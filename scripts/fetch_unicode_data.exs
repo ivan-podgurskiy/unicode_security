@@ -8,13 +8,35 @@ directory = Path.join(project_root, "priv/unicode/18.0.0-draft")
 lock_path = Path.join(project_root, "priv/unicode/sources.lock")
 sources = Source.sources()
 
+mode =
+  case System.argv() do
+    [] -> :locked
+    ["--create-lock"] -> :create_lock
+    ["--update-lock"] -> :update_lock
+    _ -> raise ArgumentError, "use no arguments, --create-lock, or --update-lock"
+  end
+
+if mode == :create_lock and File.exists?(lock_path) do
+  raise ArgumentError, "sources.lock already exists; deliberate changes require --update-lock"
+end
+
+if mode == :locked and not File.regular?(lock_path) do
+  raise ArgumentError, "sources.lock is missing; initial acquisition requires --create-lock"
+end
+
 lock =
-  if File.dir?(directory) and File.regular?(lock_path) do
+  if mode == :locked do
     {existing_lock, _binding} = Code.eval_file(lock_path)
-    :ok = Source.verify!(sources, directory, existing_lock)
+
+    if File.dir?(directory) do
+      :ok = Source.verify!(sources, directory, existing_lock)
+    else
+      Source.fetch!(sources, directory)
+    end
+
     existing_lock
   else
-    acquired_lock = Source.fetch!(sources, directory)
+    acquired_lock = Source.fetch!(sources, directory, :update_lock)
 
     lock_contents =
       inspect(acquired_lock, pretty: true, limit: :infinity, printable_limit: :infinity)

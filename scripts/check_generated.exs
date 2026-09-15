@@ -14,7 +14,8 @@ try do
     paths = [
       Generator.generate_manifest!(source_directory, temporary_directory),
       Generator.generate!(source_directory, temporary_directory),
-      Generator.generate_confusables!(source_directory, temporary_directory)
+      Generator.generate_confusables!(source_directory, temporary_directory),
+      Generator.generate_bidi!(source_directory, temporary_directory)
     ]
 
     Enum.each(paths, fn generated_path ->

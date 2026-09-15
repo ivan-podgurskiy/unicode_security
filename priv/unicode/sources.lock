@@ -1,7 +1,31 @@
 %{
+  "BidiBrackets.txt" => %{
+    bytes: 8992,
+    sha256: "4b3b62e4a14b84ee752808c810c602534921c09a4a1bf78cfbee566d66c125b3"
+  },
+  "BidiCharacterTest.txt" => %{
+    bytes: 6880771,
+    sha256: "045b24d2c8ab066951bd32fe8c6b4de34647f72b5b1c7df0265f24ab53573e01"
+  },
+  "BidiMirroring.txt" => %{
+    bytes: 27352,
+    sha256: "cd47918b28b73c3be37d730d0f48ab11e862afef9eb11d85ad832be9fb6c7f8f"
+  },
+  "BidiTest.txt" => %{
+    bytes: 7959988,
+    sha256: "9af2f882a4ab50912e388f069a673b94eacd82fa6d07d20a3ff7f3c759e905aa"
+  },
+  "DerivedBidiClass.txt" => %{
+    bytes: 176412,
+    sha256: "d9e23222522551348ea1ccfbb4f62efbf98982afb95840f8959c08ed992c5607"
+  },
   "DerivedCombiningClass.txt" => %{
     bytes: 186280,
     sha256: "ef6b2611cfb660dba3f6b458b9eb4b05f44ed2417302ee7749d7f0f348793121"
+  },
+  "DerivedCoreProperties.txt" => %{
+    bytes: 1159889,
+    sha256: "09c928886a178fcafd93c29e4bd59073a058e5a100b716d425cb563ab50f68c9"
   },
   "NormalizationTest.txt" => %{
     bytes: 2863708,

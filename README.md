@@ -35,10 +35,28 @@ display text, automatic replacement, or authorization decision. Equal skeletons
 do not prove common ownership, impersonation, or malicious intent. Preserve the
 original value; applications own identity checks and storage constraints.
 
-`skeleton/1` applies NFD, one confusables mapping pass, then NFD again using the
-embedded Unicode tables. It does not case-fold. ASCII is not exempt from
-confusables mappings (for example, `"m"` maps to `"rn"`). Output is independent of
-the host OTP Unicode tables.
+`skeleton/1` implements `bidiSkeleton(LTR, input)` from
+[UTS #39 revision 34, section 4](https://www.unicode.org/reports/tr39/tr39-34.html#Confusable_Detection).
+It applies the Unicode Bidirectional Algorithm through L2 with paragraph level
+0, restores combining marks after their bases (L3), and applies character-based
+mirroring (L4). It then applies NFD, removes `Default_Ignorable_Code_Point`,
+substitutes MA prototypes, and reapplies NFD. For example, `"pay\u200Dpal"`
+and `"paypal"` produce the same key. It does not case-fold. ASCII also has
+confusables mappings (`"m"` maps to `"rn"`). All behavior uses embedded data.
+
+The bidi implementation follows
+[UAX #9 revision 51](https://www.unicode.org/reports/tr9/tr9-51.html), the algorithm
+referenced by UTS #39 revision 34. It processes each P1 paragraph as one line,
+without display-width wrapping. U+2028 retains its pinned `WS` bidi class.
+X9 removes boundary neutrals (including NUL and noncharacters) as well as its
+specified formatting controls. When a mirrored character has no encoded
+`Bidi_Mirroring_Glyph` counterpart, its scalar is retained.
+
+The internal prototype transform is idempotent. The full bidi skeleton need
+not be: applying it again can reverse an RTL run again. Similarly, applying
+bidi preprocessing to a multi-character MA prototype can differ from applying
+it to the original single character. Always compute keys from the original
+identifier, not from a previously computed key.
 
 Inputs must be UTF-8 binaries of at most 4,096 bytes. Empty input returns `""`.
 Nonbinary input raises `ArgumentError`. Malformed UTF-8 and oversized inputs raise
@@ -73,10 +91,27 @@ mix run scripts/check_generated.exs
 
 Source fixtures are vendored for offline verification on a fresh checkout.
 The acquisition script verifies existing files against the source lock; network
-access is needed only if fixtures must be downloaded. The lock-diff check rejects
-downloads that no longer match the committed draft. Generation, conformance,
+access is needed only if fixtures must be downloaded. A surviving lock remains
+authoritative when the fixture directory is missing: all staged downloads must
+match its byte sizes and hashes before installation, and the lock is preserved.
+Initial lock creation requires `--create-lock`; deliberate upstream updates
+require `--update-lock`, followed by review and regeneration. Generation, conformance,
 and reproducibility checks run offline. Raw files stay tracked under
 `priv/unicode/18.0.0-draft` for these checks and are excluded from Hex.
+
+The bidi inputs are `extracted/DerivedBidiClass.txt` (including unassigned-code-point
+defaults), `BidiBrackets.txt`, `BidiMirroring.txt`, and `DerivedCoreProperties.txt`.
+The existing `UnicodeData.txt` also supplies nonspacing/enclosing mark categories.
+All have versioned Unicode 18.0.0 UCD URLs in the manifest. The exact
+`BidiMirroring-18.0.0.txt` source retains an upstream comment identifying its
+carried-forward Unicode 17 repertoire; that comment has not been rewritten.
+
+Tests cover all 490,846 rows of `BidiTest.txt` in every declared paragraph
+direction and all 91,707 rows of `BidiCharacterTest.txt`, through L2. Separate
+tests cover P1, L3, L4, the revision-34 LTR-confusable example, and public golden
+bytes. All 6,712 MA records verify the prototype transform, alongside the full
+normalization corpus and canonical-equivalence/idempotence properties applicable
+to each algorithm.
 
 The compatibility matrix covers Ubuntu Elixir/OTP 1.14/25, 1.17/26, 1.18/27,
 1.19/28, and 1.20/29, plus macOS and Windows 1.20/29. Every combination runs

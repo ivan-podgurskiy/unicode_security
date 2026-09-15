@@ -8,6 +8,30 @@ defmodule UnicodeSecurity.UnicodeData.Generator do
   @source_names ["UnicodeData.txt", "DerivedCombiningClass.txt"]
   @output_name "normalization.ex"
 
+  @spec generate_bidi!(Path.t(), Path.t()) :: Path.t()
+  def generate_bidi!(source_directory, output_directory) do
+    verify_sources!(source_directory, [
+      "UnicodeData.txt",
+      "DerivedCoreProperties.txt",
+      "DerivedBidiClass.txt",
+      "BidiBrackets.txt",
+      "BidiMirroring.txt"
+    ])
+
+    tables =
+      for {name, parser, packer} <- [
+            {"DerivedBidiClass", &Parser.bidi_classes!/1, &Packer.ranges/1},
+            {"DerivedCoreProperties", &Parser.default_ignorables!/1, &Packer.ranges/1},
+            {"UnicodeData", &Parser.nonspacing_marks!/1, &Packer.ranges/1},
+            {"BidiBrackets", &Parser.bidi_brackets!/1, &Packer.pairs/1},
+            {"BidiMirroring", &Parser.bidi_mirroring!/1, &Packer.pairs/1}
+          ] do
+        source_directory |> Path.join(name <> ".txt") |> File.read!() |> parser.() |> packer.()
+      end
+
+    write_output!(output_directory, "bidi.ex", render_bidi(tables))
+  end
+
   @spec generate!(Path.t(), Path.t()) :: Path.t()
   def generate!(source_directory, output_directory) do
     verify_sources!(source_directory)
@@ -71,7 +95,7 @@ defmodule UnicodeSecurity.UnicodeData.Generator do
       Enum.map_join(sources, ",\n", fn source ->
         fields =
           Enum.map_join([:name, :url, :version, :bytes, :sha256, :status], ",\n", fn key ->
-            "#{key}: #{inspect(Map.fetch!(source, key))}"
+            "#{key}: #{manifest_literal(Map.fetch!(source, key))}"
           end)
 
         "%{#{fields}}"
@@ -89,6 +113,12 @@ defmodule UnicodeSecurity.UnicodeData.Generator do
     contents = contents |> Code.format_string!() |> IO.iodata_to_binary() |> Kernel.<>("\n")
     write_output!(output_directory, "manifest.ex", contents)
   end
+
+  defp manifest_literal(value) when is_integer(value) do
+    Regex.replace(~r/(\d)(?=(\d{3})+$)/, Integer.to_string(value), "\\1_")
+  end
+
+  defp manifest_literal(value), do: inspect(value)
 
   defp write_output!(output_directory, output_name, contents) do
     output_path = Path.join(output_directory, output_name)
@@ -237,5 +267,77 @@ defmodule UnicodeSecurity.UnicodeData.Generator do
     binary
     |> Base.encode64()
     |> inspect(limit: :infinity, printable_limit: :infinity)
+  end
+
+  defp render_bidi([classes, ignorables, marks, brackets, mirrors]) do
+    source = """
+    defmodule UnicodeSecurity.Data.Bidi do
+      @moduledoc false
+
+      @classes Base.decode64!(#{encoded_literal(classes)})
+      @ignorables Base.decode64!(#{encoded_literal(ignorables)})
+      @marks Base.decode64!(#{encoded_literal(marks)})
+      @brackets Base.decode64!(#{encoded_literal(brackets)})
+      @mirrors Base.decode64!(#{encoded_literal(mirrors)})
+      @types {:l, :r, :al, :en, :es, :et, :an, :cs, :nsm, :bn, :b, :s, :ws, :on,
+              :lre, :lro, :rle, :rlo, :pdf, :lri, :rli, :fsi, :pdi}
+
+      @spec class(non_neg_integer()) :: atom()
+      def class(code), do: elem(@types, range(@classes, code))
+
+      @spec default_ignorable?(non_neg_integer()) :: boolean()
+      def default_ignorable?(code), do: range(@ignorables, code) == 1
+
+      @spec nonspacing_mark?(non_neg_integer()) :: boolean()
+      def nonspacing_mark?(code), do: range(@marks, code) == 1
+
+      @spec bracket(non_neg_integer()) :: {non_neg_integer(), :open | :close} | nil
+      def bracket(code) do
+        case pair(@brackets, code) do
+          nil -> nil
+          {target, 1} -> {target, :open}
+          {target, 2} -> {target, :close}
+        end
+      end
+
+      @spec mirror(non_neg_integer()) :: non_neg_integer()
+      def mirror(code) do
+        case pair(@mirrors, code) do
+          nil -> code
+          {target, 0} -> target
+        end
+      end
+
+      defp range(table, code), do: range(table, code, 0, div(byte_size(table), 10) - 1)
+      defp range(_table, _code, low, high) when low > high, do: 0
+
+      defp range(table, code, low, high) do
+        middle = div(low + high, 2)
+        <<first::32, last::32, value::16>> = :binary.part(table, middle * 10, 10)
+
+        cond do
+          code < first -> range(table, code, low, middle - 1)
+          code > last -> range(table, code, middle + 1, high)
+          true -> value
+        end
+      end
+
+      defp pair(table, code), do: pair(table, code, 0, div(byte_size(table), 9) - 1)
+      defp pair(_table, _code, low, high) when low > high, do: nil
+
+      defp pair(table, code, low, high) do
+        middle = div(low + high, 2)
+        <<matched::32, target::32, kind::8>> = :binary.part(table, middle * 9, 9)
+
+        cond do
+          code < matched -> pair(table, code, low, middle - 1)
+          code > matched -> pair(table, code, middle + 1, high)
+          true -> {target, kind}
+        end
+      end
+    end
+    """
+
+    source |> Code.format_string!() |> IO.iodata_to_binary() |> Kernel.<>("\n")
   end
 end

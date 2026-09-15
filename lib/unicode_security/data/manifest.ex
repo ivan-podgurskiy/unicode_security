@@ -7,11 +7,59 @@ defmodule UnicodeSecurity.Data.Manifest do
       release_status: :draft,
       sources: [
         %{
+          name: "BidiBrackets.txt",
+          url: "https://www.unicode.org/Public/18.0.0/ucd/BidiBrackets.txt",
+          version: "18.0.0",
+          bytes: 8_992,
+          sha256: "4b3b62e4a14b84ee752808c810c602534921c09a4a1bf78cfbee566d66c125b3",
+          status: :draft
+        },
+        %{
+          name: "BidiCharacterTest.txt",
+          url: "https://www.unicode.org/Public/18.0.0/ucd/BidiCharacterTest.txt",
+          version: "18.0.0",
+          bytes: 6_880_771,
+          sha256: "045b24d2c8ab066951bd32fe8c6b4de34647f72b5b1c7df0265f24ab53573e01",
+          status: :draft
+        },
+        %{
+          name: "BidiMirroring.txt",
+          url: "https://www.unicode.org/Public/18.0.0/ucd/BidiMirroring.txt",
+          version: "18.0.0",
+          bytes: 27_352,
+          sha256: "cd47918b28b73c3be37d730d0f48ab11e862afef9eb11d85ad832be9fb6c7f8f",
+          status: :draft
+        },
+        %{
+          name: "BidiTest.txt",
+          url: "https://www.unicode.org/Public/18.0.0/ucd/BidiTest.txt",
+          version: "18.0.0",
+          bytes: 7_959_988,
+          sha256: "9af2f882a4ab50912e388f069a673b94eacd82fa6d07d20a3ff7f3c759e905aa",
+          status: :draft
+        },
+        %{
+          name: "DerivedBidiClass.txt",
+          url: "https://www.unicode.org/Public/18.0.0/ucd/extracted/DerivedBidiClass.txt",
+          version: "18.0.0",
+          bytes: 176_412,
+          sha256: "d9e23222522551348ea1ccfbb4f62efbf98982afb95840f8959c08ed992c5607",
+          status: :draft
+        },
+        %{
           name: "DerivedCombiningClass.txt",
           url: "https://www.unicode.org/Public/18.0.0/ucd/extracted/DerivedCombiningClass.txt",
           version: "18.0.0",
           bytes: 186_280,
           sha256: "ef6b2611cfb660dba3f6b458b9eb4b05f44ed2417302ee7749d7f0f348793121",
+          status: :draft
+        },
+        %{
+          name: "DerivedCoreProperties.txt",
+          url: "https://www.unicode.org/Public/18.0.0/ucd/DerivedCoreProperties.txt",
+          version: "18.0.0",
+          bytes: 1_159_889,
+          sha256: "09c928886a178fcafd93c29e4bd59073a058e5a100b716d425cb563ab50f68c9",
           status: :draft
         },
         %{

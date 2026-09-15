@@ -5,7 +5,10 @@ warmups = 100
 
 cases = [
   {"ASCII identity", "paypal"},
+  {"64-byte ASCII username", String.duplicate("a", 64)},
   {"Latin/Cyrillic paypal", "p\u0430yp\u0430l"},
+  {"Revision 34 LTR example", "\u0391\u05E9\u05BA>1"},
+  {"4096-byte bidi input", String.duplicate("אב", 1_024)},
   {"4096-byte input", String.duplicate("a", 4_096)}
 ]
 
@@ -36,6 +39,10 @@ generated_beams = Path.wildcard(Path.join(beam_root, "Elixir.UnicodeSecurity.Dat
 runtime_beams =
   [
     "UnicodeSecurity",
+    "UnicodeSecurity.Bidi",
+    "UnicodeSecurity.Bidi.Explicit",
+    "UnicodeSecurity.Bidi.Weak",
+    "UnicodeSecurity.Bidi.Brackets",
     "UnicodeSecurity.Confusables",
     "UnicodeSecurity.InvalidInputError",
     "UnicodeSecurity.Normalization",

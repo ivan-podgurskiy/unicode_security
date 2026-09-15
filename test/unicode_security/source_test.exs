@@ -3,6 +3,90 @@ defmodule UnicodeSecurity.SourceTest do
 
   alias UnicodeSecurity.UnicodeData.Source
 
+  test "rejects a malformed surviving lock before writing recovery files" do
+    for lock_text <- ["nil", "false", "[]", "123"] do
+      root = temporary_directory()
+      File.mkdir_p!(root)
+      lock_path = Path.join(root, "sources.lock")
+      File.write!(lock_path, lock_text)
+      directory = Path.join(root, "sources")
+      source = %{name: "sample.txt", version: "18.0.0", status: :draft, url: "unused"}
+
+      assert_raise ArgumentError, ~r/source lock must evaluate to a map/, fn ->
+        Source.fetch!([source], directory)
+      end
+
+      refute File.exists?(directory)
+      assert File.read!(lock_path) == lock_text
+    end
+  end
+
+  test "recovers identical source bytes without rewriting the surviving lock" do
+    body = "# Version: 18.0.0\noriginal\n"
+    root = temporary_directory()
+    directory = Path.join(root, "sources")
+    File.mkdir_p!(directory)
+    File.write!(Path.join(directory, "sample.txt"), body)
+    {url, server} = serve_once(body)
+    source = %{unicode_data_source(url) | name: "sample.txt"}
+    lock = Source.lock!([source], directory)
+    lock_bytes = "# preserve formatting\n" <> inspect(lock) <> "\n"
+    File.write!(Path.join(root, "sources.lock"), lock_bytes)
+    File.rm_rf!(directory)
+
+    assert Source.fetch!([source], directory) == lock
+    Task.await(server)
+    assert File.read!(Path.join(directory, "sample.txt")) == body
+    assert File.read!(Path.join(root, "sources.lock")) == lock_bytes
+  end
+
+  test "permits deliberate update only through the explicit update mode" do
+    body = "# Version: 18.0.0\nupdated\n"
+    root = temporary_directory()
+    directory = Path.join(root, "sources")
+    File.mkdir_p!(directory)
+    File.write!(Path.join(directory, "sample.txt"), "# Version: 18.0.0\noriginal\n")
+    {url, server} = serve_once(body)
+    source = %{unicode_data_source(url) | name: "sample.txt"}
+    previous = Source.lock!([source], directory)
+    File.write!(Path.join(root, "sources.lock"), inspect(previous))
+
+    updated = Source.fetch!([source], directory, :update_lock)
+    Task.await(server)
+    refute updated == previous
+    assert Source.verify!([source], directory, updated) == :ok
+    assert File.read!(Path.join(directory, "sample.txt")) == body
+  end
+
+  # Breaks: trusting replacement downloads when an authoritative lock survives
+  # deletion of the fixture directory. Assert the install boundary and lock bytes.
+  test "keeps an existing lock authoritative during recovery of missing fixtures" do
+    original = "# Version: 18.0.0\noriginal\n"
+
+    for changed <- ["# Version: 18.0.0\nmodified\n", original <> "extra\n"] do
+      root = temporary_directory()
+      directory = Path.join(root, "sources")
+      File.mkdir_p!(directory)
+      File.write!(Path.join(directory, "sample.txt"), original)
+      {url, server} = serve_once(changed)
+      source = %{unicode_data_source(url) | name: "sample.txt"}
+      lock = Source.lock!([source], directory)
+      lock_path = Path.join(root, "sources.lock")
+      lock_bytes = inspect(lock) <> "\n"
+      File.write!(lock_path, lock_bytes)
+      File.rm_rf!(directory)
+
+      assert_raise ArgumentError, ~r/(SHA-256|byte-size) mismatch for sample.txt/, fn ->
+        Source.fetch!([source], directory)
+      end
+
+      Task.await(server)
+      refute File.exists?(directory)
+      assert File.read!(lock_path) == lock_bytes
+      assert File.ls!(root) == ["sources.lock"]
+    end
+  end
+
   test "locks and verifies source bytes" do
     directory = temporary_directory()
 

@@ -4,6 +4,24 @@ defmodule UnicodeSecurity.UnicodeData.Packer do
   @maximum_offset 0xFFFFFFFF
   @maximum_count 0xFFFF
 
+  @spec pairs([{non_neg_integer(), non_neg_integer(), 0..2}]) :: binary()
+  def pairs(pairs) do
+    {records, _previous} =
+      Enum.map_reduce(pairs, nil, fn {code, pair, kind}, previous ->
+        scalar!(code)
+        scalar!(pair)
+        ordered_after!(code, previous, :pair)
+
+        unless is_integer(kind) and kind in 0..2 do
+          raise ArgumentError, "invalid bidi pair kind: #{inspect(kind)}"
+        end
+
+        {<<code::32, pair::32, kind::8>>, code}
+      end)
+
+    IO.iodata_to_binary(records)
+  end
+
   @spec ranges([{non_neg_integer(), non_neg_integer(), non_neg_integer()}]) :: binary()
   def ranges(ranges) when is_list(ranges) do
     ranges

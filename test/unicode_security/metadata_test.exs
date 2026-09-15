@@ -1,6 +1,7 @@
 defmodule UnicodeSecurity.MetadataTest do
   use ExUnit.Case, async: true
 
+  alias UnicodeSecurity.Test.ElixirRunner
   alias UnicodeSecurity.UnicodeData.Source
 
   # Catches public metadata drifting from the pinned source declarations or lock.
@@ -31,13 +32,12 @@ defmodule UnicodeSecurity.MetadataTest do
   # A consumer must need only compiled runtime modules, without raw source files.
   test "metadata works in an isolated runtime without the source tree" do
     beam_directory = Application.app_dir(:unicode_security, "ebin")
-    elixir = System.find_executable("elixir") || raise "elixir executable not found"
 
     verification = """
     "18.0.0" = UnicodeSecurity.unicode_version()
     34 = UnicodeSecurity.uts39_revision()
     %{release_status: :draft, sources: sources} = UnicodeSecurity.data_manifest()
-    4 = length(sources)
+    10 = length(sources)
     false = Code.ensure_loaded?(UnicodeSecurity.UnicodeData.Source)
     """
 
@@ -53,9 +53,6 @@ defmodule UnicodeSecurity.MetadataTest do
       end)
 
     assert {"", 0} =
-             System.cmd(elixir, ["-e", loader <> "\n" <> verification],
-               cd: System.tmp_dir!(),
-               stderr_to_stdout: true
-             )
+             ElixirRunner.run(loader <> "\n" <> verification, cd: System.tmp_dir!())
   end
 end

@@ -27,16 +27,65 @@ defmodule UnicodeSecurity.UnicodeData.Source do
       url: "https://www.unicode.org/Public/draft/security/confusables.txt",
       version: "18.0.0",
       status: :draft
+    },
+    %{
+      name: "DerivedCoreProperties.txt",
+      url: "https://www.unicode.org/Public/18.0.0/ucd/DerivedCoreProperties.txt",
+      version: "18.0.0",
+      status: :draft
+    },
+    %{
+      name: "DerivedBidiClass.txt",
+      url: "https://www.unicode.org/Public/18.0.0/ucd/extracted/DerivedBidiClass.txt",
+      version: "18.0.0",
+      status: :draft
+    },
+    %{
+      name: "BidiBrackets.txt",
+      url: "https://www.unicode.org/Public/18.0.0/ucd/BidiBrackets.txt",
+      version: "18.0.0",
+      status: :draft
+    },
+    %{
+      name: "BidiMirroring.txt",
+      url: "https://www.unicode.org/Public/18.0.0/ucd/BidiMirroring.txt",
+      version: "18.0.0",
+      status: :draft
+    },
+    %{
+      name: "BidiTest.txt",
+      url: "https://www.unicode.org/Public/18.0.0/ucd/BidiTest.txt",
+      version: "18.0.0",
+      status: :draft
+    },
+    %{
+      name: "BidiCharacterTest.txt",
+      url: "https://www.unicode.org/Public/18.0.0/ucd/BidiCharacterTest.txt",
+      version: "18.0.0",
+      status: :draft
     }
   ]
 
   @spec sources() :: [map()]
   def sources, do: @sources
 
-  @spec fetch!([map()], Path.t()) :: map()
-  def fetch!(declarations, directory) do
+  @spec fetch!([map()], Path.t(), :locked | :update_lock) :: map()
+  def fetch!(declarations, directory, mode \\ :locked) when mode in [:locked, :update_lock] do
     declarations = validate_fetch_declarations!(declarations)
     parent = Path.dirname(directory)
+    lock_path = Path.join(parent, "sources.lock")
+
+    expected_lock =
+      if mode == :locked and File.regular?(lock_path) do
+        {lock, _binding} = Code.eval_file(lock_path)
+
+        unless is_map(lock) do
+          raise ArgumentError, "Unicode source lock must evaluate to a map"
+        end
+
+        lock
+      end
+
     staging = temporary_path(directory, "staging")
 
     File.mkdir_p!(parent)
@@ -44,6 +93,7 @@ defmodule UnicodeSecurity.UnicodeData.Source do
 
     try do
       Enum.each(declarations, &fetch_source!(&1, staging))
+      if expected_lock, do: verify!(declarations, staging, expected_lock)
       lock = lock!(declarations, staging)
       install_staged!(staging, directory)
       lock

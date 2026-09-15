@@ -37,12 +37,28 @@ defmodule UnicodeSecurity do
   display value, replacement for the original input, or authorization decision.
   This milestone uses draft data and is not ready for publication.
 
-  The algorithm applies pinned NFD, one confusables mapping pass, and pinned NFD
-  again. It performs no case folding. ASCII characters can also have mappings.
+  UTS #39 revision 34 defines this as `bidiSkeleton(LTR, input)`. It first applies
+  the pinned Unicode Bidirectional Algorithm in isolation at paragraph level 0,
+  including combining-mark placement and character-based mirroring. It then
+  applies NFD, removes default-ignorable characters, maps MA prototypes, and
+  reapplies NFD. It performs no case folding. ASCII characters can also map.
+
+  Each Unicode paragraph is treated as one line, without layout-dependent
+  wrapping. X9 boundary neutrals and formatting controls are removed. Mirrored
+  characters with no encoded mirror counterpart retain their code point.
+  Skeletons of arbitrary bidirectional strings need not be idempotent.
 
   Accepts a UTF-8 binary of at most 4,096 bytes. Raises `ArgumentError` for
   nonbinary input and `UnicodeSecurity.InvalidInputError` for malformed UTF-8
   or oversized input. The returned skeleton may exceed the input byte limit.
+
+  ## Examples
+
+      iex> UnicodeSecurity.skeleton("pаypаl")
+      "paypal"
+
+      iex> UnicodeSecurity.skeleton("m")
+      "rn"
   """
   @spec skeleton(binary()) :: binary()
   defdelegate skeleton(input), to: UnicodeSecurity.Confusables

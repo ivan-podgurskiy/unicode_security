@@ -2,8 +2,38 @@ defmodule UnicodeSecurity.GeneratorTest do
   use ExUnit.Case, async: false
 
   alias UnicodeSecurity.Data.Normalization
+  alias UnicodeSecurity.Test.ElixirRunner
   alias UnicodeSecurity.UnicodeData.Generator
   alias UnicodeSecurity.UnicodeData.Source
+
+  test "generates deterministic bidi properties and identity defaults" do
+    root = temporary_directory()
+    source_directory = write_sources!(root)
+    first = Generator.generate_bidi!(source_directory, Path.join(root, "first"))
+    second = Generator.generate_bidi!(source_directory, Path.join(root, "second"))
+    assert File.read!(first) == File.read!(second)
+
+    verification = """
+    [{UnicodeSecurity.Data.Bidi, _}] = Code.compile_file(#{inspect(first)})
+    :l = UnicodeSecurity.Data.Bidi.class(0x41)
+    :r = UnicodeSecurity.Data.Bidi.class(0x590)
+    :nsm = UnicodeSecurity.Data.Bidi.class(0x5B0)
+    :al = UnicodeSecurity.Data.Bidi.class(0x600)
+    :l = UnicodeSecurity.Data.Bidi.class(0x10FFFF)
+    true = UnicodeSecurity.Data.Bidi.default_ignorable?(0x200D)
+    false = UnicodeSecurity.Data.Bidi.default_ignorable?(0x41)
+    true = UnicodeSecurity.Data.Bidi.nonspacing_mark?(0x300)
+    false = UnicodeSecurity.Data.Bidi.nonspacing_mark?(0x41)
+    {0x29, :open} = UnicodeSecurity.Data.Bidi.bracket(0x28)
+    {0x28, :close} = UnicodeSecurity.Data.Bidi.bracket(0x29)
+    nil = UnicodeSecurity.Data.Bidi.bracket(0x41)
+    0x3E = UnicodeSecurity.Data.Bidi.mirror(0x3C)
+    0x3C = UnicodeSecurity.Data.Bidi.mirror(0x3E)
+    0x2140 = UnicodeSecurity.Data.Bidi.mirror(0x2140)
+    """
+
+    assert {"", 0} = ElixirRunner.run(verification)
+  end
 
   test "rejects a non-map source lock before generating output" do
     root = temporary_directory()
@@ -46,8 +76,7 @@ defmodule UnicodeSecurity.GeneratorTest do
     true = UnicodeSecurity.Data.Manifest.get() == expected
     """
 
-    elixir = System.find_executable("elixir") || raise "elixir executable not found"
-    assert {"", 0} = System.cmd(elixir, ["-e", verification], stderr_to_stdout: true)
+    assert {"", 0} = ElixirRunner.run(verification)
   end
 
   test "refuses manifest generation when a conformance-only source changes" do
@@ -66,7 +95,7 @@ defmodule UnicodeSecurity.GeneratorTest do
     root = checker_project!()
     assert {"", 0} = run_check(root, "check_generated.exs")
 
-    for name <- ["normalization.ex", "confusables.ex", "manifest.ex"] do
+    for name <- ["normalization.ex", "confusables.ex", "bidi.ex", "manifest.ex"] do
       path = Path.join(root, "lib/unicode_security/data/#{name}")
       original = File.read!(path)
       File.write!(path, original <> "# drift\n")
@@ -85,16 +114,15 @@ defmodule UnicodeSecurity.GeneratorTest do
     File.cp!("scripts/generate_unicode_data.exs", script)
 
     originals =
-      Map.new(["normalization.ex", "confusables.ex", "manifest.ex"], fn name ->
+      Map.new(["normalization.ex", "confusables.ex", "bidi.ex", "manifest.ex"], fn name ->
         path = Path.join(root, "lib/unicode_security/data/#{name}")
         contents = File.read!(path) <> "# existing output to preserve\n"
         File.write!(path, contents)
         {path, contents}
       end)
 
-    elixir = System.find_executable("elixir") || raise "elixir executable not found"
     beam_directory = Application.app_dir(:unicode_security, "ebin")
-    invocation = "Mix.start(); Code.require_file(#{inspect(script)})"
+    invocation = "Mix.start()\nCode.require_file(#{inspect(script)})\n"
 
     for source <- Source.sources() do
       source_path = Path.join(root, "priv/unicode/18.0.0-draft/#{source.name}")
@@ -102,10 +130,7 @@ defmodule UnicodeSecurity.GeneratorTest do
       File.write!(source_path, original_source <> "# tampered\n")
 
       {output, status} =
-        System.cmd(elixir, ["-pa", beam_directory, "-e", invocation],
-          cd: root,
-          stderr_to_stdout: true
-        )
+        ElixirRunner.run(invocation, paths: [beam_directory], cd: root)
 
       assert status != 0
       assert output =~ "byte-size mismatch for #{source.name}"
@@ -161,8 +186,7 @@ defmodule UnicodeSecurity.GeneratorTest do
     [0x0041, 0x0300] = UnicodeSecurity.Data.Confusables.mapping(0x1200)
     """
 
-    elixir = System.find_executable("elixir") || raise "elixir executable not found"
-    assert {"", 0} = System.cmd(elixir, ["-e", verification], stderr_to_stdout: true)
+    assert {"", 0} = ElixirRunner.run(verification)
   end
 
   test "refuses confusable generation when the locked source changes" do
@@ -210,8 +234,7 @@ defmodule UnicodeSecurity.GeneratorTest do
     0 = UnicodeSecurity.Data.Normalization.combining_class(0x0041)
     """
 
-    elixir = System.find_executable("elixir") || raise "elixir executable not found"
-    assert {"", 0} = System.cmd(elixir, ["-e", verification], stderr_to_stdout: true)
+    assert {"", 0} = ElixirRunner.run(verification)
 
     assert Normalization.decomposition(0x1200) == nil
   end
@@ -230,6 +253,7 @@ defmodule UnicodeSecurity.GeneratorTest do
       Path.join(source_directory, "UnicodeData.txt"),
       "00C0;LATIN CAPITAL LETTER A WITH GRAVE;Lu;0;L;0041 0300;;;;N;;;;00E0;\n" <>
         "00A0;NO-BREAK SPACE;Zs;0;CS;<noBreak> 0020;;;;N;;;;;\n" <>
+        "0300;COMBINING GRAVE ACCENT;Mn;230;NSM;;;;;N;;;;;\n" <>
         additional_mappings
     )
 
@@ -244,6 +268,18 @@ defmodule UnicodeSecurity.GeneratorTest do
     )
 
     File.write!(Path.join(source_directory, "NormalizationTest.txt"), "# fixture\n")
+
+    for {name, body} <- [
+          {"DerivedCoreProperties", "200C..200D; Default_Ignorable_Code_Point\n"},
+          {"DerivedBidiClass",
+           "# @missing: 0000..10FFFF; Left_To_Right\n# @missing: 0590..05FF; Right_To_Left\n# @missing: 0600..07BF; Arabic_Letter\n05B0; NSM\n"},
+          {"BidiBrackets", "0028; 0029; o\n0029; 0028; c\n"},
+          {"BidiMirroring", "003C; 003E\n003E; 003C\n"},
+          {"BidiTest", ""},
+          {"BidiCharacterTest", ""}
+        ] do
+      File.write!(Path.join(source_directory, name <> ".txt"), "# #{name}-18.0.0.txt\n" <> body)
+    end
 
     write_lock!(root, source_directory)
     source_directory
@@ -271,6 +307,7 @@ defmodule UnicodeSecurity.GeneratorTest do
     output_directory = Path.join(root, "lib/unicode_security/data")
     Generator.generate!(source_directory, output_directory)
     Generator.generate_confusables!(source_directory, output_directory)
+    Generator.generate_bidi!(source_directory, output_directory)
     Generator.generate_manifest!(source_directory, output_directory)
     root
   end
