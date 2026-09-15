@@ -6,6 +6,33 @@ defmodule UnicodeSecurity.GeneratorTest do
   alias UnicodeSecurity.UnicodeData.Generator
   alias UnicodeSecurity.UnicodeData.Source
 
+  test "generates deterministic script ranges with canonical literal aliases and fallback" do
+    root = temporary_directory()
+    source_directory = write_sources!(root)
+    first = Generator.generate_scripts!(source_directory, Path.join(root, "first"))
+    second = Generator.generate_scripts!(source_directory, Path.join(root, "second"))
+    assert File.read!(first) == File.read!(second)
+
+    verification = """
+    [{UnicodeSecurity.Data.Scripts, _}] = Code.compile_file(#{inspect(first)})
+    :latin = UnicodeSecurity.Data.Scripts.script(0x41)
+    :unknown = UnicodeSecurity.Data.Scripts.script(0x10FFFF)
+    [:latin] = UnicodeSecurity.Data.Scripts.extensions(0x41)
+    [:cyrillic, :latin] = UnicodeSecurity.Data.Scripts.extensions(0x300)
+    [:unknown] = UnicodeSecurity.Data.Scripts.extensions(0x10FFFF)
+    """
+
+    assert {"", 0} = ElixirRunner.run(verification)
+
+    File.write!(Path.join(source_directory, "NormalizationTest.txt"), "tampered\n")
+
+    assert_raise ArgumentError, ~r/byte-size mismatch/, fn ->
+      Generator.generate_scripts!(source_directory, Path.join(root, "tampered"))
+    end
+
+    refute File.exists?(Path.join(root, "tampered"))
+  end
+
   test "generates deterministic bidi properties and identity defaults" do
     root = temporary_directory()
     source_directory = write_sources!(root)
@@ -95,7 +122,7 @@ defmodule UnicodeSecurity.GeneratorTest do
     root = checker_project!()
     assert {"", 0} = run_check(root, "check_generated.exs")
 
-    for name <- ["normalization.ex", "confusables.ex", "bidi.ex", "manifest.ex"] do
+    for name <- ["normalization.ex", "confusables.ex", "bidi.ex", "scripts.ex", "manifest.ex"] do
       path = Path.join(root, "lib/unicode_security/data/#{name}")
       original = File.read!(path)
       File.write!(path, original <> "# drift\n")
@@ -114,12 +141,15 @@ defmodule UnicodeSecurity.GeneratorTest do
     File.cp!("scripts/generate_unicode_data.exs", script)
 
     originals =
-      Map.new(["normalization.ex", "confusables.ex", "bidi.ex", "manifest.ex"], fn name ->
-        path = Path.join(root, "lib/unicode_security/data/#{name}")
-        contents = File.read!(path) <> "# existing output to preserve\n"
-        File.write!(path, contents)
-        {path, contents}
-      end)
+      Map.new(
+        ["normalization.ex", "confusables.ex", "bidi.ex", "scripts.ex", "manifest.ex"],
+        fn name ->
+          path = Path.join(root, "lib/unicode_security/data/#{name}")
+          contents = File.read!(path) <> "# existing output to preserve\n"
+          File.write!(path, contents)
+          {path, contents}
+        end
+      )
 
     beam_directory = Application.app_dir(:unicode_security, "ebin")
     invocation = "Mix.start()\nCode.require_file(#{inspect(script)})\n"
@@ -270,6 +300,9 @@ defmodule UnicodeSecurity.GeneratorTest do
     File.write!(Path.join(source_directory, "NormalizationTest.txt"), "# fixture\n")
 
     for {name, body} <- [
+          {"PropertyValueAliases", "sc; Latn; Latin\nsc; Cyrl; Cyrillic\nsc; Zzzz; Unknown\n"},
+          {"Scripts", "# @missing: 0000..10FFFF; Unknown\n0041..005A; Latin\n"},
+          {"ScriptExtensions", "# @missing: 0000..10FFFF; <script>\n0300; Latn Cyrl\n"},
           {"DerivedCoreProperties", "200C..200D; Default_Ignorable_Code_Point\n"},
           {"DerivedBidiClass",
            "# @missing: 0000..10FFFF; Left_To_Right\n# @missing: 0590..05FF; Right_To_Left\n# @missing: 0600..07BF; Arabic_Letter\n05B0; NSM\n"},
@@ -308,6 +341,7 @@ defmodule UnicodeSecurity.GeneratorTest do
     Generator.generate!(source_directory, output_directory)
     Generator.generate_confusables!(source_directory, output_directory)
     Generator.generate_bidi!(source_directory, output_directory)
+    Generator.generate_scripts!(source_directory, output_directory)
     Generator.generate_manifest!(source_directory, output_directory)
     root
   end

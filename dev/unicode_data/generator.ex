@@ -3,10 +3,104 @@ defmodule UnicodeSecurity.UnicodeData.Generator do
 
   alias UnicodeSecurity.UnicodeData.Packer
   alias UnicodeSecurity.UnicodeData.Parser
+  alias UnicodeSecurity.UnicodeData.ScriptParser
   alias UnicodeSecurity.UnicodeData.Source
 
   @source_names ["UnicodeData.txt", "DerivedCombiningClass.txt"]
   @output_name "normalization.ex"
+
+  @spec generate_scripts!(Path.t(), Path.t()) :: Path.t()
+  def generate_scripts!(source_directory, output_directory) do
+    Source.verify!(Source.sources(), source_directory, read_lock!(source_directory))
+
+    aliases =
+      source_directory
+      |> Path.join("PropertyValueAliases.txt")
+      |> File.read!()
+      |> ScriptParser.aliases!()
+
+    scripts =
+      source_directory
+      |> Path.join("Scripts.txt")
+      |> File.read!()
+      |> ScriptParser.scripts!(aliases)
+
+    extensions =
+      source_directory
+      |> Path.join("ScriptExtensions.txt")
+      |> File.read!()
+      |> ScriptParser.extensions!(aliases)
+
+    names = [
+      "unknown"
+      | aliases |> Map.values() |> Enum.uniq() |> Enum.sort() |> Enum.reject(&(&1 == "unknown"))
+    ]
+
+    sets = extensions |> Enum.map(&elem(&1, 2)) |> Enum.uniq() |> Enum.sort()
+    script_indices = names |> Enum.with_index() |> Map.new()
+    extension_indices = sets |> Enum.with_index(1) |> Map.new()
+    packed_scripts = indexed_ranges(scripts, script_indices)
+    packed_extensions = indexed_ranges(extensions, extension_indices)
+
+    write_output!(
+      output_directory,
+      "scripts.ex",
+      render_scripts(names, sets, packed_scripts, packed_extensions)
+    )
+  end
+
+  defp indexed_ranges(records, indices) do
+    records
+    |> Enum.map(fn {first, last, value} -> {first, last, Map.fetch!(indices, value)} end)
+    |> Packer.ranges()
+  end
+
+  defp render_scripts(names, sets, scripts, extensions) do
+    # Names have been restricted to ASCII letters/underscores by ScriptParser.
+    # Emit literal atoms; never intern input-derived atoms in the generator/runtime.
+    names_literal = Enum.map_join(names, ",", &(":" <> &1))
+
+    sets_literal =
+      Enum.map_join(sets, ",", fn set -> "[" <> Enum.map_join(set, ",", &(":" <> &1)) <> "]" end)
+
+    source = """
+    defmodule UnicodeSecurity.Data.Scripts do
+      @moduledoc false
+
+      @scripts Base.decode64!(#{encoded_literal(scripts)})
+      @extensions Base.decode64!(#{encoded_literal(extensions)})
+      @names {#{names_literal}}
+      @sets {nil, #{sets_literal}}
+
+      @spec script(non_neg_integer()) :: atom()
+      def script(code), do: elem(@names, range(@scripts, code))
+
+      @spec extensions(non_neg_integer()) :: [atom()]
+      def extensions(code) do
+        case range(@extensions, code) do
+          0 -> [script(code)]
+          index -> elem(@sets, index)
+        end
+      end
+
+      defp range(table, code), do: range(table, code, 0, div(byte_size(table), 10) - 1)
+      defp range(_table, _code, low, high) when low > high, do: 0
+
+      defp range(table, code, low, high) do
+        middle = div(low + high, 2)
+        <<first::32, last::32, value::16>> = :binary.part(table, middle * 10, 10)
+
+        cond do
+          code < first -> range(table, code, low, middle - 1)
+          code > last -> range(table, code, middle + 1, high)
+          true -> value
+        end
+      end
+    end
+    """
+
+    source |> Code.format_string!() |> IO.iodata_to_binary() |> Kernel.<>("\n")
+  end
 
   @spec generate_bidi!(Path.t(), Path.t()) :: Path.t()
   def generate_bidi!(source_directory, output_directory) do

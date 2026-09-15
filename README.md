@@ -1,12 +1,13 @@
 # UnicodeSecurity
 
-Pinned Unicode normalization and confusable comparison keys for Elixir.
+Pinned Unicode normalization, confusable comparison keys, and script detection for Elixir.
 
 > **Development status:** Unicode 18 data is currently draft. This package is not
 > releasable until the final Unicode 18 data is published and pinned.
 
 Milestone 0 is the data and normalization foundation: strict UTF-8 validation,
-pinned NFD, UTS #39 skeleton generation, and compiled source provenance. Runtime
+pinned NFD, UTS #39 skeleton generation, and compiled source provenance. Milestone 1
+adds script properties and mixed-script detection. Runtime
 operation is pure Elixir, offline, stateless, and has no dependencies, NIFs,
 application processes, file access, network access, or dynamic atom creation.
 
@@ -63,9 +64,45 @@ Nonbinary input raises `ArgumentError`. Malformed UTF-8 and oversized inputs rai
 `UnicodeSecurity.InvalidInputError` with `reason` and a zero-based `byte_offset`;
 oversized inputs report offset 4,096. Generated output may exceed 4,096 bytes.
 
-Policy verdicts, identifier profiles, script analysis, IDNA/domain handling,
+Policy verdicts, identifier profiles, IDNA/domain handling,
 pairwise classification, collection/batch APIs, and Ecto integration are outside
 this milestone. The package does not decide whether an identifier is safe.
+
+## Script detection
+
+```elixir
+UnicodeSecurity.scripts("раypal")
+#=> [:cyrillic, :latin]
+
+UnicodeSecurity.scripts("a \u0301")
+#=> [:common, :inherited, :latin]
+
+UnicodeSecurity.mixed_script?("раypal")
+#=> true
+
+UnicodeSecurity.mixed_script?("ねガ")
+#=> false
+```
+
+`scripts/1` reports sorted, unique **Script** property values from the original
+input as lowercase snake-case atoms. It includes Common, Inherited, and Unknown;
+empty input returns `[]`. No normalization or skeleton transform is applied.
+
+`mixed_script?/1` implements
+[UTS #39 revision 34, section 5.1](https://www.unicode.org/reports/tr39/tr39-34.html#Mixed_Script_Detection):
+intersect the augmented **Script_Extensions** sets, treating Common/Inherited
+extension values as neutral. Augmentation supports Han with Latin (`Hntl`),
+Japanese (`Jpan`), Korean (`Kore`), and Han with Bopomofo (`Hanb`). Thus `"ねガ"`
+and `"漢a"` are single-script under this definition, although their ordinary
+Script properties differ. Empty or wholly neutral input returns `false`.
+An explicit extension set takes precedence over the ordinary property;
+for example, `"aー"` is mixed even though U+30FC has Script=Common.
+
+Both APIs share the 4,096-byte UTF-8 input limit and original-input errors
+described above. Neither decides identifier validity or whether a name is safe.
+The pinned sources are `Scripts.txt`, `ScriptExtensions.txt`, and
+`PropertyValueAliases.txt`; see
+[UAX #24](https://www.unicode.org/reports/tr24/) for property definitions.
 
 ## Data and development
 

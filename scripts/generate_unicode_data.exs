@@ -16,3 +16,6 @@ Mix.shell().info("generated #{Path.relative_to(confusables_path, project_root)}"
 
 bidi_path = Generator.generate_bidi!(source_directory, output_directory)
 Mix.shell().info("generated #{Path.relative_to(bidi_path, project_root)}")
+
+scripts_path = Generator.generate_scripts!(source_directory, output_directory)
+Mix.shell().info("generated #{Path.relative_to(scripts_path, project_root)}")

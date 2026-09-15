@@ -71,6 +71,30 @@ defmodule UnicodeSecurity.Data.Manifest do
           status: :draft
         },
         %{
+          name: "PropertyValueAliases.txt",
+          url: "https://www.unicode.org/Public/18.0.0/ucd/PropertyValueAliases.txt",
+          version: "18.0.0",
+          bytes: 83_536,
+          sha256: "06c4c8eaf7b0bf34abe73b113da1215bd784ac254d4c223600b90267caa4bbbd",
+          status: :draft
+        },
+        %{
+          name: "ScriptExtensions.txt",
+          url: "https://www.unicode.org/Public/18.0.0/ucd/ScriptExtensions.txt",
+          version: "18.0.0",
+          bytes: 21_145,
+          sha256: "5c9d34a922f687726f2a8bcf57d49f905987e51f1b21b58c95a00fbe255cec23",
+          status: :draft
+        },
+        %{
+          name: "Scripts.txt",
+          url: "https://www.unicode.org/Public/18.0.0/ucd/Scripts.txt",
+          version: "18.0.0",
+          bytes: 196_089,
+          sha256: "0071fd81b6aeae25f6e8bce8efec3066a6476a91b49bdb2f52dc76e817862a6a",
+          status: :draft
+        },
+        %{
           name: "UnicodeData.txt",
           url: "https://www.unicode.org/Public/18.0.0/ucd/UnicodeData.txt",
           version: "18.0.0",

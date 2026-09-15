@@ -37,7 +37,7 @@ defmodule UnicodeSecurity.MetadataTest do
     "18.0.0" = UnicodeSecurity.unicode_version()
     34 = UnicodeSecurity.uts39_revision()
     %{release_status: :draft, sources: sources} = UnicodeSecurity.data_manifest()
-    10 = length(sources)
+    13 = length(sources)
     false = Code.ensure_loaded?(UnicodeSecurity.UnicodeData.Source)
     """
 

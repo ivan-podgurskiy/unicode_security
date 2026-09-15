@@ -28,7 +28,7 @@ defmodule UnicodeSecurity.ProjectTest do
       assert path in packaged
     end
 
-    for name <- ~w(confusables manifest normalization) do
+    for name <- ~w(bidi confusables manifest normalization scripts) do
       assert "lib/unicode_security/data/#{name}.ex" in packaged
     end
 
@@ -41,10 +41,17 @@ defmodule UnicodeSecurity.ProjectTest do
     end
   end
 
-  test "exports the complete Milestone 0 public interface" do
+  test "exports skeleton, metadata and script detection" do
     assert Code.ensure_loaded?(UnicodeSecurity)
 
-    for {name, arity} <- [skeleton: 1, unicode_version: 0, uts39_revision: 0, data_manifest: 0] do
+    for {name, arity} <- [
+          skeleton: 1,
+          scripts: 1,
+          mixed_script?: 1,
+          unicode_version: 0,
+          uts39_revision: 0,
+          data_manifest: 0
+        ] do
       assert function_exported?(UnicodeSecurity, name, arity)
     end
   end

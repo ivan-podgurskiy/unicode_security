@@ -2,7 +2,7 @@ defmodule UnicodeSecurity do
   @moduledoc """
   Unicode identifier security primitives backed by pinned Unicode data.
 
-  Milestone 0 provides `skeleton/1` and compiled-data metadata. A skeleton is a
+  Provides `skeleton/1`, script detection, and compiled-data metadata. A skeleton is a
   comparison key only. It must never serve as a canonical identifier, replacement
   value, or authorization decision. Matching keys do not establish identity or intent.
 
@@ -62,4 +62,48 @@ defmodule UnicodeSecurity do
   """
   @spec skeleton(binary()) :: binary()
   defdelegate skeleton(input), to: UnicodeSecurity.Confusables
+
+  @doc """
+  Returns the sorted unique Script property values observed in the original input.
+
+  Values are lowercase snake-case atoms from the pinned Unicode data, including
+  `:common`, `:inherited`, and `:unknown`. This reports ordinary Script properties;
+  use `mixed_script?/1` for UTS #39 detection with Script_Extensions.
+
+  Accepts a UTF-8 binary of at most 4,096 bytes. Raises `ArgumentError` for
+  nonbinary input and `UnicodeSecurity.InvalidInputError` for malformed UTF-8
+  or oversized input, with offsets in the original input.
+
+  ## Examples
+
+      iex> UnicodeSecurity.scripts("раypal")
+      [:cyrillic, :latin]
+
+      iex> UnicodeSecurity.scripts("a \\u0301")
+      [:common, :inherited, :latin]
+  """
+  @spec scripts(binary()) :: [atom()]
+  defdelegate scripts(input), to: UnicodeSecurity.Scripts
+
+  @doc """
+  Detects mixed scripts using UTS #39 revision 34, section 5.1.
+
+  Intersects augmented Script_Extensions sets, including the Han/Latin,
+  Japanese, Korean, and Han/Bopomofo combinations. Common and Inherited
+  extension values are neutral. Empty and wholly neutral inputs return `false`.
+  This is a script test, not an identifier validity or authorization decision.
+
+  Accepts a UTF-8 binary of at most 4,096 bytes, with the same errors and original
+  input offsets as `scripts/1`.
+
+  ## Examples
+
+      iex> UnicodeSecurity.mixed_script?("раypal")
+      true
+
+      iex> UnicodeSecurity.mixed_script?("ねガ")
+      false
+  """
+  @spec mixed_script?(binary()) :: boolean()
+  defdelegate mixed_script?(input), to: UnicodeSecurity.Scripts
 end

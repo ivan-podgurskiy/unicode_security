@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Script property reporting with `scripts/1` and UTS #39 revision 34 augmented
+  Script_Extensions detection with `mixed_script?/1`, using three additional
+  locked Unicode 18 sources and preserving existing hashes.
 - Milestone 0 foundation with strict UTF-8 validation and a 4,096-byte input limit.
 - Pinned Unicode 18.0.0 canonical decomposition, combining-class ordering, and
   algorithmic Hangul decomposition, independent of host OTP Unicode tables.

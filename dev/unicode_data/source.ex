@@ -5,6 +5,24 @@ defmodule UnicodeSecurity.UnicodeData.Source do
 
   @sources [
     %{
+      name: "Scripts.txt",
+      url: "https://www.unicode.org/Public/18.0.0/ucd/Scripts.txt",
+      version: "18.0.0",
+      status: :draft
+    },
+    %{
+      name: "ScriptExtensions.txt",
+      url: "https://www.unicode.org/Public/18.0.0/ucd/ScriptExtensions.txt",
+      version: "18.0.0",
+      status: :draft
+    },
+    %{
+      name: "PropertyValueAliases.txt",
+      url: "https://www.unicode.org/Public/18.0.0/ucd/PropertyValueAliases.txt",
+      version: "18.0.0",
+      status: :draft
+    },
+    %{
       name: "UnicodeData.txt",
       url: "https://www.unicode.org/Public/18.0.0/ucd/UnicodeData.txt",
       version: "18.0.0",
