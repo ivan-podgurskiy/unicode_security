@@ -8,8 +8,8 @@ identifier security properties for Elixir.
 
 Milestone 0 is the data and normalization foundation: strict UTF-8 validation,
 pinned NFD, UTS #39 skeleton generation, and compiled source provenance. Milestone 1
-adds script properties, mixed-script detection, and UTS #39 identifier profile
-membership. Runtime
+adds script properties, mixed-script and mixed-number detection, UTS #39 identifier
+profile membership, and restriction levels. Runtime
 operation is pure Elixir, offline, stateless, and has no dependencies, NIFs,
 application processes, file access, network access, or dynamic atom creation.
 
@@ -140,6 +140,52 @@ it does not use host Unicode properties.
 This predicate adds no application syntax exceptions and does not validate identifier
 grammar. Empty input is vacuously allowed. It shares the 4,096-byte UTF-8 limit and
 original-input errors described above.
+
+## Numbers and restriction levels
+
+```elixir
+UnicodeSecurity.mixed_number?("1١")
+#=> true
+
+UnicodeSecurity.restriction_level("paypal")
+#=> :ascii
+
+UnicodeSecurity.restriction_level("aねガ")
+#=> :highly_restrictive
+
+UnicodeSecurity.restriction_level("pay\u200Dpal")
+#=> :unrestricted
+```
+
+`mixed_number?/1` follows
+[UTS #39 revision 34, section 5.3](https://www.unicode.org/reports/tr39/tr39-34.html#Mixed_Number_Detection),
+counting distinct decimal systems by their zero scalar (`scalar - decimal value`)
+from pinned `UnicodeData.txt` Nd records. Non-Nd numeric characters, such as fractions,
+Roman numerals, and circled numbers, do not introduce systems. Empty input returns
+`false`. This is detection, not an identifier syntax validator.
+
+`restriction_level/1` follows
+[UTS #39 revision 34, section 5.2](https://www.unicode.org/reports/tr39/tr39-34.html#Restriction_Level_Detection).
+It first tests canonically closed General Security Profile membership; outside-profile
+strings return `:unrestricted`, even if ASCII or single-script. It then returns the
+first applicable level: `:ascii`, `:single_script_restrictive`, `:highly_restrictive`,
+`:moderately_restrictive`, or `:minimally_restrictive`. Empty input returns `:ascii`.
+Script detection uses resolved augmented Script_Extensions, not the ordinary observed
+Script list. For mixed strings, whole script-set entries containing Latin are removed
+before checking CJK coverage and the remaining script intersection.
+
+The Recommended set is frozen from
+[UAX #31 revision 44, Table 5](https://www.unicode.org/reports/tr31/tr31-44.html#Table_Recommended_Scripts)
+(Unicode 18.0.0 proposed): Common, Inherited, Arabic, Armenian, Bengali, Cyrillic,
+Devanagari, Ethiopic, Georgian, Greek, Gujarati, Gurmukhi, Hangul, Han, Hebrew,
+Hiragana, Katakana, Kannada, Khmer, Lao, Latin, Malayalam, Myanmar, Oriya, Sinhala,
+Tamil, Telugu, Thaana, Thai, and Tibetan. Greek and Cyrillic are excluded from the
+moderately restrictive mixed-script test. Bopomofo has been Limited Use since Unicode
+17, and its restricted profile scalars return `:unrestricted` before CJK coverage.
+
+These APIs share the 4,096-byte UTF-8 limit and original-input errors. Neither adds
+syntax rules, application profile exceptions, or a safety/authorization verdict.
+Mixed numbers do not change the restriction level; use their separate predicate.
 
 ## Data and development
 

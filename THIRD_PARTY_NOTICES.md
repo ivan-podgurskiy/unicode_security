@@ -6,7 +6,9 @@ This package includes generated tables derived from the Unicode Character
 Database and Unicode Technical Standard #39, "Unicode Security Mechanisms."
 Those data and specifications are copyright Unicode, Inc. and are distributed
 under the Unicode License v3 reproduced below. The package includes derived
-normalization, confusables, script, and identifier-property tables and a provenance manifest. Raw source files
+normalization, confusables, script, decimal-number, and identifier-property tables
+and a provenance manifest. The Recommended script set is derived from UAX #31
+revision 44, Table 5 (Unicode 18.0.0 proposed). Raw source files
 and the normalization conformance corpus are development inputs and are not
 included in the Hex package.
 
@@ -18,6 +20,7 @@ that Unicode, Inc. endorses the package or that the draft data is final.
 The referenced materials and license are available from:
 
 - [UTS #39 revision 34](https://www.unicode.org/reports/tr39/tr39-34.html)
+- [UAX #31 revision 44](https://www.unicode.org/reports/tr31/tr31-44.html)
 - [Unicode 18.0.0 data](https://www.unicode.org/Public/18.0.0/ucd/)
 - [Draft security data](https://www.unicode.org/Public/draft/security/)
 - [Unicode License v3](https://www.unicode.org/license.txt)

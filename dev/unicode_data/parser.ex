@@ -113,6 +113,42 @@ defmodule UnicodeSecurity.UnicodeData.Parser do
     |> sorted_ranges!()
   end
 
+  @spec decimal_zeros!(binary()) :: [{codepoint(), codepoint(), codepoint()}]
+  def decimal_zeros!(input) do
+    input
+    |> records!()
+    |> validate_unicode_data_records!()
+    |> Enum.flat_map(&decimal_record!/1)
+    |> Enum.group_by(fn {code, value} -> code - value end)
+    |> Enum.map(fn {zero, digits} ->
+      unless zero >= 0 and Enum.sort(digits) == Enum.map(0..9, &{zero + &1, &1}) do
+        raise ArgumentError, "inconsistent UnicodeData decimal system at #{hex(zero)}"
+      end
+
+      {zero, zero + 9, zero}
+    end)
+    |> Enum.sort()
+  end
+
+  defp decimal_record!(record) do
+    [_, _, _, _, decimal, digit, numeric | _] = record.fields
+
+    cond do
+      record.category == "Nd" ->
+        unless decimal in ~w(0 1 2 3 4 5 6 7 8 9) and digit == decimal and numeric == decimal do
+          raise ArgumentError, "inconsistent UnicodeData decimal fields at #{record.code}"
+        end
+
+        [{record.codepoint, String.to_integer(decimal)}]
+
+      decimal != "" ->
+        raise ArgumentError, "UnicodeData decimal value on non-Nd scalar at #{record.code}"
+
+      true ->
+        []
+    end
+  end
+
   defp bidi_defaults!(input) do
     missing =
       input

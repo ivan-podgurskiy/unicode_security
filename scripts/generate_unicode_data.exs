@@ -22,3 +22,6 @@ Mix.shell().info("generated #{Path.relative_to(scripts_path, project_root)}")
 
 identifier_path = Generator.generate_identifier!(source_directory, output_directory)
 Mix.shell().info("generated #{Path.relative_to(identifier_path, project_root)}")
+
+numbers_path = Generator.generate_numbers!(source_directory, output_directory)
+Mix.shell().info("generated #{Path.relative_to(numbers_path, project_root)}")

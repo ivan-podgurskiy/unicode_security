@@ -75,6 +75,32 @@ defmodule UnicodeSecurity.GeneratorTest do
     assert {"", 0} = ElixirRunner.run(verification)
   end
 
+  test "generates deterministic decimal zero ranges with nil defaults and lock validation" do
+    root = temporary_directory()
+    source_directory = write_sources!(root)
+    first = Generator.generate_numbers!(source_directory, Path.join(root, "first"))
+    second = Generator.generate_numbers!(source_directory, Path.join(root, "second"))
+    assert File.read!(first) == File.read!(second)
+
+    verification = """
+    [{UnicodeSecurity.Data.Numbers, _}] = Code.compile_file(#{inspect(first)})
+    nil = UnicodeSecurity.Data.Numbers.zero(0)
+    0x30 = UnicodeSecurity.Data.Numbers.zero(0x30)
+    0x30 = UnicodeSecurity.Data.Numbers.zero(0x39)
+    nil = UnicodeSecurity.Data.Numbers.zero(0x40)
+    nil = UnicodeSecurity.Data.Numbers.zero(0x10FFFF)
+    """
+
+    assert {"", 0} = ElixirRunner.run(verification)
+    File.write!(Path.join(source_directory, "NormalizationTest.txt"), "tampered\n")
+
+    assert_raise ArgumentError, ~r/byte-size mismatch/, fn ->
+      Generator.generate_numbers!(source_directory, Path.join(root, "tampered"))
+    end
+
+    refute File.exists?(Path.join(root, "tampered"))
+  end
+
   test "generates deterministic script ranges with canonical literal aliases and fallback" do
     root = temporary_directory()
     source_directory = write_sources!(root)
@@ -197,6 +223,7 @@ defmodule UnicodeSecurity.GeneratorTest do
           "bidi.ex",
           "scripts.ex",
           "identifier.ex",
+          "numbers.ex",
           "manifest.ex"
         ] do
       path = Path.join(root, "lib/unicode_security/data/#{name}")
@@ -224,6 +251,7 @@ defmodule UnicodeSecurity.GeneratorTest do
           "bidi.ex",
           "scripts.ex",
           "identifier.ex",
+          "numbers.ex",
           "manifest.ex"
         ],
         fn name ->
@@ -367,7 +395,13 @@ defmodule UnicodeSecurity.GeneratorTest do
       "00C0;LATIN CAPITAL LETTER A WITH GRAVE;Lu;0;L;0041 0300;;;;N;;;;00E0;\n" <>
         "00A0;NO-BREAK SPACE;Zs;0;CS;<noBreak> 0020;;;;N;;;;;\n" <>
         "0300;COMBINING GRAVE ACCENT;Mn;230;NSM;;;;;N;;;;;\n" <>
-        additional_mappings
+        additional_mappings <>
+        Enum.map_join(0..9, fn value ->
+          code =
+            Integer.to_string(0x30 + value, 16) |> String.upcase() |> String.pad_leading(4, "0")
+
+          "#{code};DIGIT;Nd;0;EN;;#{value};#{value};#{value};N;;;;;\n"
+        end)
     )
 
     File.write!(
@@ -435,6 +469,7 @@ defmodule UnicodeSecurity.GeneratorTest do
     Generator.generate_bidi!(source_directory, output_directory)
     Generator.generate_scripts!(source_directory, output_directory)
     Generator.generate_identifier!(source_directory, output_directory)
+    Generator.generate_numbers!(source_directory, output_directory)
     Generator.generate_manifest!(source_directory, output_directory)
     root
   end

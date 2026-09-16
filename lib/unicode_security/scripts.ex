@@ -30,6 +30,22 @@ defmodule UnicodeSecurity.Scripts do
     end)
   end
 
+  # UTS #39 revision 34, section 5.2 step 5: discard entire augmented
+  # entries containing Latin (not just the Latin member of each entry).
+  @doc false
+  @spec resolved_without_latin([non_neg_integer()]) :: :all | MapSet.t(atom())
+  def resolved_without_latin(scalars) do
+    Enum.reduce(scalars, :all, fn code, resolved ->
+      intersect_without_latin(resolved, augmented_set(code))
+    end)
+  end
+
+  defp intersect_without_latin(resolved, :all), do: resolved
+
+  defp intersect_without_latin(resolved, set) do
+    if MapSet.member?(set, :latin), do: resolved, else: intersect(resolved, set)
+  end
+
   defp augmented_set(code) do
     extensions = Data.extensions(code)
 

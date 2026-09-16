@@ -11,6 +11,46 @@ defmodule UnicodeSecurity.UnicodeData.Generator do
   @source_names ["UnicodeData.txt", "DerivedCombiningClass.txt"]
   @output_name "normalization.ex"
 
+  @spec generate_numbers!(Path.t(), Path.t()) :: Path.t()
+  def generate_numbers!(source_directory, output_directory) do
+    Source.verify!(Source.sources(), source_directory, read_lock!(source_directory))
+
+    packed =
+      source_directory
+      |> Path.join("UnicodeData.txt")
+      |> File.read!()
+      |> Parser.decimal_zeros!()
+      |> Enum.map(fn {first, last, zero} -> <<first::32, last::32, zero::32>> end)
+      |> IO.iodata_to_binary()
+
+    source = """
+    defmodule UnicodeSecurity.Data.Numbers do
+      @moduledoc false
+
+      @zeros Base.decode64!(#{encoded_literal(packed)})
+
+      @spec zero(non_neg_integer()) :: non_neg_integer() | nil
+      def zero(code), do: lookup(code, 0, div(byte_size(@zeros), 12) - 1)
+
+      defp lookup(_code, low, high) when low > high, do: nil
+
+      defp lookup(code, low, high) do
+        middle = div(low + high, 2)
+        <<first::32, last::32, zero::32>> = :binary.part(@zeros, middle * 12, 12)
+
+        cond do
+          code < first -> lookup(code, low, middle - 1)
+          code > last -> lookup(code, middle + 1, high)
+          true -> zero
+        end
+      end
+    end
+    """
+
+    contents = source |> Code.format_string!() |> IO.iodata_to_binary() |> Kernel.<>("\n")
+    write_output!(output_directory, "numbers.ex", contents)
+  end
+
   @spec generate_identifier!(Path.t(), Path.t()) :: Path.t()
   def generate_identifier!(source_directory, output_directory) do
     Source.verify!(Source.sources(), source_directory, read_lock!(source_directory))

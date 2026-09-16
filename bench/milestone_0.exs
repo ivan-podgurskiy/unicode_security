@@ -7,28 +7,37 @@ cases = [
   {"ASCII identity", "paypal"},
   {"64-byte ASCII username", String.duplicate("a", 64)},
   {"Latin/Cyrillic paypal", "p\u0430yp\u0430l"},
+  {"Mixed decimal systems", "1١"},
+  {"Latin/Japanese identifier", "aねガ"},
+  {"Latin/Devanagari identifier", "aअ"},
   {"Revision 34 LTR example", "\u0391\u05E9\u05BA>1"},
   {"4096-byte bidi input", String.duplicate("אב", 1_024)},
   {"4096-byte input", String.duplicate("a", 4_096)}
 ]
 
+analyses = [
+  {"Skeleton", &UnicodeSecurity.skeleton/1},
+  {"Mixed number", &UnicodeSecurity.mixed_number?/1},
+  {"Restriction level", &UnicodeSecurity.restriction_level/1}
+]
+
 IO.puts("Elixir #{System.version()} / OTP #{System.otp_release()}")
 IO.puts("#{warmups} warmups; #{iterations} samples per case; medians in microseconds")
 
-for {name, input} <- cases do
-  for _ <- 1..warmups, do: UnicodeSecurity.skeleton(input)
+for {analysis, function} <- analyses, {name, input} <- cases do
+  for _ <- 1..warmups, do: function.(input)
 
   samples =
     for _ <- 1..iterations do
       started = System.monotonic_time()
-      UnicodeSecurity.skeleton(input)
+      function.(input)
       elapsed = System.monotonic_time() - started
       System.convert_time_unit(elapsed, :native, :nanosecond) / 1_000
     end
     |> Enum.sort()
 
   median = (Enum.at(samples, div(iterations, 2) - 1) + Enum.at(samples, div(iterations, 2))) / 2
-  IO.puts("#{name} (#{byte_size(input)} bytes): #{Float.round(median, 3)} us")
+  IO.puts("#{analysis}: #{name} (#{byte_size(input)} bytes): #{Float.round(median, 3)} us")
 end
 
 project_root = Path.expand("..", __DIR__)
@@ -46,6 +55,9 @@ runtime_beams =
     "UnicodeSecurity.Confusables",
     "UnicodeSecurity.InvalidInputError",
     "UnicodeSecurity.Normalization",
+    "UnicodeSecurity.Identifier",
+    "UnicodeSecurity.Restrictions",
+    "UnicodeSecurity.Scripts",
     "UnicodeSecurity.Utf8"
   ]
   |> Enum.map(&Path.join(beam_root, "Elixir.#{&1}.beam"))

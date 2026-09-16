@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- UTS #39 revision 34 mixed-decimal-number detection and ordered restriction levels,
+  using the canonically closed General Security Profile, augmented script sets, and
+  the frozen UAX #31 revision 44 Recommended scripts; no policy or syntax exceptions.
 - Exact UTS #39 Identifier_Status and Identifier_Type scalar lookups, plus
   canonically closed General Security Profile membership with no syntax exceptions.
 - Script property reporting with `scripts/1` and UTS #39 revision 34 augmented

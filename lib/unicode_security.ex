@@ -2,7 +2,8 @@ defmodule UnicodeSecurity do
   @moduledoc """
   Unicode identifier security primitives backed by pinned Unicode data.
 
-  Provides `skeleton/1`, script and identifier-property detection, and compiled-data
+  Provides `skeleton/1`, script, number, and restriction-level detection, identifier
+  properties, and compiled-data
   metadata. A skeleton is a comparison key only. It must never serve as a canonical
   identifier, replacement value, or authorization decision. Matching keys do not
   establish identity or intent.
@@ -11,6 +12,14 @@ defmodule UnicodeSecurity do
   See `data_manifest/0` for pinned source hashes and status. Runtime calls use only
   compiled data, with no file or network access or application processes.
   """
+
+  @type restriction_level ::
+          :ascii
+          | :single_script_restrictive
+          | :highly_restrictive
+          | :moderately_restrictive
+          | :minimally_restrictive
+          | :unrestricted
 
   @doc "Returns the Unicode version used by the compiled data; see `data_manifest/0` for draft status."
   @spec unicode_version() :: binary()
@@ -152,4 +161,54 @@ defmodule UnicodeSecurity do
   """
   @spec allowed_identifier?(binary()) :: boolean()
   defdelegate allowed_identifier?(input), to: UnicodeSecurity.Identifier, as: :allowed?
+
+  @doc """
+  Detects multiple decimal number systems using UTS #39 revision 34, section 5.3.
+
+  Only Decimal_Number (Nd) scalars contribute a system, identified by their
+  pinned zero character. Other numeric characters do not contribute systems;
+  this does not validate identifier syntax or profile membership.
+
+  Accepts a UTF-8 binary of at most 4,096 bytes, with the same errors and
+  original input offsets as `scripts/1`. Empty input returns `false`.
+
+  ## Examples
+
+      iex> UnicodeSecurity.mixed_number?("123")
+      false
+
+      iex> UnicodeSecurity.mixed_number?("1١")
+      true
+  """
+  @spec mixed_number?(binary()) :: boolean()
+  defdelegate mixed_number?(input), to: UnicodeSecurity.Restrictions
+
+  @doc """
+  Returns the first applicable UTS #39 revision 34, section 5.2 restriction level.
+
+  Ordered levels are `:ascii`, `:single_script_restrictive`, `:highly_restrictive`,
+  `:moderately_restrictive`, `:minimally_restrictive`, and `:unrestricted`. The
+  canonically closed General Security Profile is tested first: outside-profile
+  inputs return `:unrestricted`, even when ASCII or single-script. Empty input
+  returns `:ascii`.
+
+  Uses resolved augmented Script_Extensions, not the observed Script values
+  returned by `scripts/1`. Recommended scripts are frozen from UAX #31 revision
+  44, Table 5 (Unicode 18.0.0 proposed); Bopomofo is Limited Use, not Recommended.
+  This primitive adds no syntax rules or policy exceptions and is not a safety
+  or authorization decision. Mixed numbers are detected separately.
+
+  Accepts a UTF-8 binary of at most 4,096 bytes, with the same errors and
+  original input offsets as `scripts/1`.
+
+  ## Examples
+
+      iex> UnicodeSecurity.restriction_level("paypal")
+      :ascii
+
+      iex> UnicodeSecurity.restriction_level("aねガ")
+      :highly_restrictive
+  """
+  @spec restriction_level(binary()) :: restriction_level()
+  defdelegate restriction_level(input), to: UnicodeSecurity.Restrictions
 end
