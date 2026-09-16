@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Exact UTS #39 Identifier_Status and Identifier_Type scalar lookups, plus
+  canonically closed General Security Profile membership with no syntax exceptions.
 - Script property reporting with `scripts/1` and UTS #39 revision 34 augmented
   Script_Extensions detection with `mixed_script?/1`, using three additional
   locked Unicode 18 sources and preserving existing hashes.

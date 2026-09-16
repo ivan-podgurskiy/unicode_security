@@ -1,13 +1,15 @@
 # UnicodeSecurity
 
-Pinned Unicode normalization, confusable comparison keys, and script detection for Elixir.
+Pinned Unicode normalization, confusable comparison keys, script detection, and
+identifier security properties for Elixir.
 
 > **Development status:** Unicode 18 data is currently draft. This package is not
 > releasable until the final Unicode 18 data is published and pinned.
 
 Milestone 0 is the data and normalization foundation: strict UTF-8 validation,
 pinned NFD, UTS #39 skeleton generation, and compiled source provenance. Milestone 1
-adds script properties and mixed-script detection. Runtime
+adds script properties, mixed-script detection, and UTS #39 identifier profile
+membership. Runtime
 operation is pure Elixir, offline, stateless, and has no dependencies, NIFs,
 application processes, file access, network access, or dynamic atom creation.
 
@@ -64,7 +66,7 @@ Nonbinary input raises `ArgumentError`. Malformed UTF-8 and oversized inputs rai
 `UnicodeSecurity.InvalidInputError` with `reason` and a zero-based `byte_offset`;
 oversized inputs report offset 4,096. Generated output may exceed 4,096 bytes.
 
-Policy verdicts, identifier profiles, IDNA/domain handling,
+Policy verdicts, application-specific identifier syntax, IDNA/domain handling,
 pairwise classification, collection/batch APIs, and Ecto integration are outside
 this milestone. The package does not decide whether an identifier is safe.
 
@@ -104,6 +106,41 @@ The pinned sources are `Scripts.txt`, `ScriptExtensions.txt`, and
 `PropertyValueAliases.txt`; see
 [UAX #24](https://www.unicode.org/reports/tr24/) for property definitions.
 
+## Identifier status and type
+
+```elixir
+UnicodeSecurity.identifier_status(?a)
+#=> :allowed
+
+UnicodeSecurity.identifier_types(0x200D)
+#=> [:default_ignorable]
+
+UnicodeSecurity.allowed_identifier?("paypal")
+#=> true
+
+UnicodeSecurity.allowed_identifier?("pay\u200Dpal")
+#=> false
+```
+
+`identifier_status/1` and `identifier_types/1` report exact scalar properties from
+the pinned UTS #39 data. They accept only integer Unicode scalar values; surrogates,
+out-of-range integers, and other terms raise `ArgumentError`. Identifier_Status
+defaults to `:restricted`; Identifier_Type defaults to `[:not_character]`. Type sets
+are sorted lowercase snake-case atoms from a closed literal set.
+
+`allowed_identifier?/1` tests membership in the canonically closed
+[UTS #39 General Security Profile](https://www.unicode.org/reports/tr39/tr39-34.html#General_Security_Profile).
+It accepts when some canonically equivalent representation contains only Allowed
+characters. Consequently, exact scalar status and string membership deliberately
+differ: U+0115 is Restricted, while both `"ĕ"` and its decomposition `"e\u0306"`
+are accepted. The implementation uses pinned NFD data, generated explicit-composition
+rescues, algorithmic Hangul composition, and bounded suffix dynamic programming;
+it does not use host Unicode properties.
+
+This predicate adds no application syntax exceptions and does not validate identifier
+grammar. Empty input is vacuously allowed. It shares the 4,096-byte UTF-8 limit and
+original-input errors described above.
+
 ## Data and development
 
 Unicode 18.0.0 / UTS #39 revision 34 is pinned as **draft**. The embedded manifest
@@ -136,7 +173,8 @@ require `--update-lock`, followed by review and regeneration. Generation, confor
 and reproducibility checks run offline. Raw files stay tracked under
 `priv/unicode/18.0.0-draft` for these checks and are excluded from Hex.
 
-The bidi inputs are `extracted/DerivedBidiClass.txt` (including unassigned-code-point
+Identifier properties come from the pinned draft `IdentifierStatus.txt` and
+`IdentifierType.txt` files. The bidi inputs are `extracted/DerivedBidiClass.txt` (including unassigned-code-point
 defaults), `BidiBrackets.txt`, `BidiMirroring.txt`, and `DerivedCoreProperties.txt`.
 The existing `UnicodeData.txt` also supplies nonspacing/enclosing mark categories.
 All have versioned Unicode 18.0.0 UCD URLs in the manifest. The exact

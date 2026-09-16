@@ -16,7 +16,8 @@ try do
       Generator.generate!(source_directory, temporary_directory),
       Generator.generate_confusables!(source_directory, temporary_directory),
       Generator.generate_bidi!(source_directory, temporary_directory),
-      Generator.generate_scripts!(source_directory, temporary_directory)
+      Generator.generate_scripts!(source_directory, temporary_directory),
+      Generator.generate_identifier!(source_directory, temporary_directory)
     ]
 
     Enum.each(paths, fn generated_path ->

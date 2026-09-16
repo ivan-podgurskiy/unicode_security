@@ -1,6 +1,8 @@
 defmodule UnicodeSecurity.UnicodeData.Generator do
   @moduledoc false
 
+  alias UnicodeSecurity.UnicodeData.IdentifierGenerator
+  alias UnicodeSecurity.UnicodeData.IdentifierParser
   alias UnicodeSecurity.UnicodeData.Packer
   alias UnicodeSecurity.UnicodeData.Parser
   alias UnicodeSecurity.UnicodeData.ScriptParser
@@ -8,6 +10,38 @@ defmodule UnicodeSecurity.UnicodeData.Generator do
 
   @source_names ["UnicodeData.txt", "DerivedCombiningClass.txt"]
   @output_name "normalization.ex"
+
+  @spec generate_identifier!(Path.t(), Path.t()) :: Path.t()
+  def generate_identifier!(source_directory, output_directory) do
+    Source.verify!(Source.sources(), source_directory, read_lock!(source_directory))
+
+    statuses =
+      source_directory
+      |> Path.join("IdentifierStatus.txt")
+      |> File.read!()
+      |> IdentifierParser.statuses!()
+
+    types =
+      source_directory
+      |> Path.join("IdentifierType.txt")
+      |> File.read!()
+      |> IdentifierParser.types!()
+
+    decompositions =
+      source_directory
+      |> Path.join("UnicodeData.txt")
+      |> File.read!()
+      |> Parser.unicode_data!()
+
+    combining_classes =
+      source_directory
+      |> Path.join("DerivedCombiningClass.txt")
+      |> File.read!()
+      |> Parser.ranges!(:integer)
+
+    contents = IdentifierGenerator.render!(statuses, types, decompositions, combining_classes)
+    write_output!(output_directory, "identifier.ex", contents)
+  end
 
   @spec generate_scripts!(Path.t(), Path.t()) :: Path.t()
   def generate_scripts!(source_directory, output_directory) do

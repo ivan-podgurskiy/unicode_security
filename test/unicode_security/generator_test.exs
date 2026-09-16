@@ -4,7 +4,60 @@ defmodule UnicodeSecurity.GeneratorTest do
   alias UnicodeSecurity.Data.Normalization
   alias UnicodeSecurity.Test.ElixirRunner
   alias UnicodeSecurity.UnicodeData.Generator
+  alias UnicodeSecurity.UnicodeData.IdentifierGenerator
   alias UnicodeSecurity.UnicodeData.Source
+
+  test "reproduces the complete locked identifier corpus including canonical rescue data" do
+    output = Generator.generate_identifier!("priv/unicode/18.0.0-draft", temporary_directory())
+    assert File.read!(output) == File.read!("lib/unicode_security/data/identifier.ex")
+  end
+
+  test "rejects identifier rescue shapes and bounds unsupported by the runtime" do
+    statuses = [{0x41, 0x41, :allowed}, {0x1200, 0x1208, :allowed}, {0xAC00, 0xD7A3, :allowed}]
+    classes = [{0x0300, 0x0314, 230}]
+
+    for decomposition <- [
+          [0x0300, 0x41],
+          [0x41, 0x42, 0x43, 0x44],
+          [0x41 | List.duplicate(0x0300, 255)]
+        ] do
+      assert_raise ArgumentError, ~r/unsupported identifier rescue CCC shape/, fn ->
+        IdentifierGenerator.render!(statuses, [], %{0x1200 => decomposition}, classes)
+      end
+    end
+
+    decompositions = Map.new(0x1200..0x1208, &{&1, [0x41, 0x0300 + &1 - 0x1200]})
+
+    assert_raise ArgumentError, ~r/candidates exceed runtime bound/, fn ->
+      IdentifierGenerator.render!(statuses, [], decompositions, classes)
+    end
+
+    assert_raise ArgumentError, ~r/unsupported Hangul identifier profile/, fn ->
+      IdentifierGenerator.render!([{0x41, 0x41, :allowed}], [], %{}, [])
+    end
+  end
+
+  test "generates deterministic identifier ranges with exact defaults and sorted type sets" do
+    root = temporary_directory()
+    source_directory = write_sources!(root)
+    first = Generator.generate_identifier!(source_directory, Path.join(root, "first"))
+    second = Generator.generate_identifier!(source_directory, Path.join(root, "second"))
+    assert File.read!(first) == File.read!(second)
+
+    verification = """
+    [{UnicodeSecurity.Data.Identifier, _}] = Code.compile_file(#{inspect(first)})
+    :allowed = UnicodeSecurity.Data.Identifier.status(0x41)
+    :restricted = UnicodeSecurity.Data.Identifier.status(0x62)
+    :restricted = UnicodeSecurity.Data.Identifier.status(0x10FFFF)
+    [:recommended] = UnicodeSecurity.Data.Identifier.types(0x41)
+    [:obsolete, :technical] = UnicodeSecurity.Data.Identifier.types(0x018D)
+    [:not_character] = UnicodeSecurity.Data.Identifier.types(0x10FFFF)
+    [[0x41, 0x0300]] = UnicodeSecurity.Data.Identifier.rescues(0x41)
+    [] = UnicodeSecurity.Data.Identifier.rescues(0x42)
+    """
+
+    assert {"", 0} = ElixirRunner.run(verification)
+  end
 
   test "generates deterministic script ranges with canonical literal aliases and fallback" do
     root = temporary_directory()
@@ -122,7 +175,14 @@ defmodule UnicodeSecurity.GeneratorTest do
     root = checker_project!()
     assert {"", 0} = run_check(root, "check_generated.exs")
 
-    for name <- ["normalization.ex", "confusables.ex", "bidi.ex", "scripts.ex", "manifest.ex"] do
+    for name <- [
+          "normalization.ex",
+          "confusables.ex",
+          "bidi.ex",
+          "scripts.ex",
+          "identifier.ex",
+          "manifest.ex"
+        ] do
       path = Path.join(root, "lib/unicode_security/data/#{name}")
       original = File.read!(path)
       File.write!(path, original <> "# drift\n")
@@ -142,7 +202,14 @@ defmodule UnicodeSecurity.GeneratorTest do
 
     originals =
       Map.new(
-        ["normalization.ex", "confusables.ex", "bidi.ex", "scripts.ex", "manifest.ex"],
+        [
+          "normalization.ex",
+          "confusables.ex",
+          "bidi.ex",
+          "scripts.ex",
+          "identifier.ex",
+          "manifest.ex"
+        ],
         fn name ->
           path = Path.join(root, "lib/unicode_security/data/#{name}")
           contents = File.read!(path) <> "# existing output to preserve\n"
@@ -303,6 +370,10 @@ defmodule UnicodeSecurity.GeneratorTest do
           {"PropertyValueAliases", "sc; Latn; Latin\nsc; Cyrl; Cyrillic\nsc; Zzzz; Unknown\n"},
           {"Scripts", "# @missing: 0000..10FFFF; Unknown\n0041..005A; Latin\n"},
           {"ScriptExtensions", "# @missing: 0000..10FFFF; <script>\n0300; Latn Cyrl\n"},
+          {"IdentifierStatus",
+           "# Version: 18.0.0\n# @missing: 0000..10FFFF; Restricted\n0041; Allowed\n0062; Restricted\n1200; Allowed\nAC00..D7A3; Allowed\n"},
+          {"IdentifierType",
+           "# Version: 18.0.0\n# @missing: 0000..10FFFF; Not_Character\n0041; Recommended\n018D; Technical Obsolete\n"},
           {"DerivedCoreProperties", "200C..200D; Default_Ignorable_Code_Point\n"},
           {"DerivedBidiClass",
            "# @missing: 0000..10FFFF; Left_To_Right\n# @missing: 0590..05FF; Right_To_Left\n# @missing: 0600..07BF; Arabic_Letter\n05B0; NSM\n"},
@@ -311,7 +382,12 @@ defmodule UnicodeSecurity.GeneratorTest do
           {"BidiTest", ""},
           {"BidiCharacterTest", ""}
         ] do
-      File.write!(Path.join(source_directory, name <> ".txt"), "# #{name}-18.0.0.txt\n" <> body)
+      header =
+        if name in ["IdentifierStatus", "IdentifierType"],
+          do: "# #{name}.txt\n",
+          else: "# #{name}-18.0.0.txt\n"
+
+      File.write!(Path.join(source_directory, name <> ".txt"), header <> body)
     end
 
     write_lock!(root, source_directory)
@@ -342,6 +418,7 @@ defmodule UnicodeSecurity.GeneratorTest do
     Generator.generate_confusables!(source_directory, output_directory)
     Generator.generate_bidi!(source_directory, output_directory)
     Generator.generate_scripts!(source_directory, output_directory)
+    Generator.generate_identifier!(source_directory, output_directory)
     Generator.generate_manifest!(source_directory, output_directory)
     root
   end

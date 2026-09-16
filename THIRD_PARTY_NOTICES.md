@@ -6,7 +6,7 @@ This package includes generated tables derived from the Unicode Character
 Database and Unicode Technical Standard #39, "Unicode Security Mechanisms."
 Those data and specifications are copyright Unicode, Inc. and are distributed
 under the Unicode License v3 reproduced below. The package includes derived
-normalization and confusables tables and a provenance manifest. Raw source files
+normalization, confusables, script, and identifier-property tables and a provenance manifest. Raw source files
 and the normalization conformance corpus are development inputs and are not
 included in the Hex package.
 

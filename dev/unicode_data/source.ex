@@ -5,6 +5,18 @@ defmodule UnicodeSecurity.UnicodeData.Source do
 
   @sources [
     %{
+      name: "IdentifierStatus.txt",
+      url: "https://www.unicode.org/Public/draft/security/IdentifierStatus.txt",
+      version: "18.0.0",
+      status: :draft
+    },
+    %{
+      name: "IdentifierType.txt",
+      url: "https://www.unicode.org/Public/draft/security/IdentifierType.txt",
+      version: "18.0.0",
+      status: :draft
+    },
+    %{
       name: "Scripts.txt",
       url: "https://www.unicode.org/Public/18.0.0/ucd/Scripts.txt",
       version: "18.0.0",

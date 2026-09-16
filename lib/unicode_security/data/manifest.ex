@@ -63,6 +63,22 @@ defmodule UnicodeSecurity.Data.Manifest do
           status: :draft
         },
         %{
+          name: "IdentifierStatus.txt",
+          url: "https://www.unicode.org/Public/draft/security/IdentifierStatus.txt",
+          version: "18.0.0",
+          bytes: 148_042,
+          sha256: "5863c7d99ca18f213c41c7318aa5528bebfb6d32ec0f1d5944e37192c119aebd",
+          status: :draft
+        },
+        %{
+          name: "IdentifierType.txt",
+          url: "https://www.unicode.org/Public/draft/security/IdentifierType.txt",
+          version: "18.0.0",
+          bytes: 534_017,
+          sha256: "fa24851acc669e58670e354e7b98a4ec8f52a809ec4f80524b6a60efdb868831",
+          status: :draft
+        },
+        %{
           name: "NormalizationTest.txt",
           url: "https://www.unicode.org/Public/18.0.0/ucd/NormalizationTest.txt",
           version: "18.0.0",

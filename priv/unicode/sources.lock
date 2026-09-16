@@ -1,4 +1,12 @@
 %{
+  "IdentifierStatus.txt" => %{
+    bytes: 148042,
+    sha256: "5863c7d99ca18f213c41c7318aa5528bebfb6d32ec0f1d5944e37192c119aebd"
+  },
+  "IdentifierType.txt" => %{
+    bytes: 534017,
+    sha256: "fa24851acc669e58670e354e7b98a4ec8f52a809ec4f80524b6a60efdb868831"
+  },
   "PropertyValueAliases.txt" => %{
     bytes: 83536,
     sha256: "06c4c8eaf7b0bf34abe73b113da1215bd784ac254d4c223600b90267caa4bbbd"
