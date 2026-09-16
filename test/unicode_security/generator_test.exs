@@ -12,6 +12,22 @@ defmodule UnicodeSecurity.GeneratorTest do
     assert File.read!(output) == File.read!("lib/unicode_security/data/identifier.ex")
   end
 
+  test "rejects identifier rescues with a singleton Restricted starter" do
+    statuses = [{0x1200, 0x1200, :allowed}, {0xAC00, 0xD7A3, :allowed}]
+
+    assert_raise ArgumentError, ~r/unsupported identifier rescue CCC shape: \[0\]/, fn ->
+      IdentifierGenerator.render!(statuses, [], %{0x1200 => [0x41]}, [])
+    end
+  end
+
+  test "rejects identifier rescues with a singleton Restricted nonstarter" do
+    statuses = [{0x1200, 0x1200, :allowed}, {0xAC00, 0xD7A3, :allowed}]
+
+    assert_raise ArgumentError, ~r/unsupported identifier rescue CCC shape: \[230\]/, fn ->
+      IdentifierGenerator.render!(statuses, [], %{0x1200 => [0x0300]}, [{0x0300, 0x0300, 230}])
+    end
+  end
+
   test "rejects identifier rescue shapes and bounds unsupported by the runtime" do
     statuses = [{0x41, 0x41, :allowed}, {0x1200, 0x1208, :allowed}, {0xAC00, 0xD7A3, :allowed}]
     classes = [{0x0300, 0x0314, 230}]

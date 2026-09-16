@@ -21,7 +21,7 @@ defmodule UnicodeSecurity.UnicodeData.IdentifierGenerator do
       |> Enum.reject(&hangul_syllable?/1)
       |> Enum.map(&generator_nfd(&1, decompositions, combining_classes))
       |> Enum.filter(fn decomposition ->
-        length(decomposition) > 1 and Enum.any?(decomposition, &(not MapSet.member?(allowed, &1)))
+        Enum.any?(decomposition, &(not MapSet.member?(allowed, &1)))
       end)
       |> Enum.uniq()
       |> Enum.sort()
@@ -191,7 +191,7 @@ defmodule UnicodeSecurity.UnicodeData.IdentifierGenerator do
     Enum.each(rescues, fn mapping ->
       classes = Enum.map(mapping, &Map.get(combining_classes, &1, 0))
 
-      unless length(mapping) <= 255 and hd(classes) == 0 and
+      unless length(mapping) in 2..255 and hd(classes) == 0 and
                (Enum.all?(tl(classes), &(&1 > 0)) or classes in [[0, 0], [0, 0, 0]]) do
         raise ArgumentError, "unsupported identifier rescue CCC shape: #{inspect(classes)}"
       end
