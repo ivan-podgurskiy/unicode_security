@@ -115,6 +115,11 @@ defmodule UnicodeSecurity.GeneratorTest do
     [:latin] = UnicodeSecurity.Data.Scripts.extensions(0x41)
     [:cyrillic, :latin] = UnicodeSecurity.Data.Scripts.extensions(0x300)
     [:unknown] = UnicodeSecurity.Data.Scripts.extensions(0x10FFFF)
+    true = UnicodeSecurity.Data.Scripts.known_script?(:latin)
+    true = UnicodeSecurity.Data.Scripts.known_script?(:unknown)
+    false = UnicodeSecurity.Data.Scripts.known_script?(:jpan)
+    false = UnicodeSecurity.Data.Scripts.known_script?("latin")
+    false = UnicodeSecurity.Data.Scripts.known_script?(%{})
     """
 
     assert {"", 0} = ElixirRunner.run(verification)

@@ -11,6 +11,21 @@ defmodule UnicodeSecurity.ScriptsTest do
   @scripts "# Scripts-18.0.0.txt\n# @missing: 0000..10FFFF; Unknown\n"
   @extensions "# ScriptExtensions-18.0.0.txt\n# @missing: 0000..10FFFF; <script>\n"
 
+  test "recognizes every canonical script name from the independently read pinned aliases" do
+    expected_names =
+      reference_lines("PropertyValueAliases.txt")
+      |> Enum.flat_map(fn
+        ["sc", _short, long | _other] -> [String.downcase(long)]
+        _ -> []
+      end)
+      |> Enum.sort()
+
+    # Only existing atoms from the compiled table are used; never create atoms.
+    for name <- expected_names do
+      assert Data.known_script?(String.to_existing_atom(name))
+    end
+  end
+
   @tag timeout: 120_000
   test "matches every scalar, range boundary and default in independently read pinned properties" do
     aliases =

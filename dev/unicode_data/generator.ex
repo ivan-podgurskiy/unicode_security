@@ -146,6 +146,9 @@ defmodule UnicodeSecurity.UnicodeData.Generator do
       @names {#{names_literal}}
       @sets {nil, #{sets_literal}}
 
+      @spec known_script?(term()) :: boolean()
+      def known_script?(name), do: :lists.member(name, Tuple.to_list(@names))
+
       @spec script(non_neg_integer()) :: atom()
       def script(code), do: elem(@names, range(@scripts, code))
 
