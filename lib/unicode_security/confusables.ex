@@ -12,6 +12,13 @@ defmodule UnicodeSecurity.Confusables do
     input
     |> Utf8.decode!()
     |> Enum.map(fn {scalar, _offset} -> scalar end)
+    |> skeleton_scalars()
+  end
+
+  @doc false
+  @spec skeleton_scalars([non_neg_integer()]) :: binary()
+  def skeleton_scalars(scalars) do
+    scalars
     |> Bidi.reorder()
     |> internal_skeleton()
     |> Enum.map(fn scalar -> <<scalar::utf8>> end)

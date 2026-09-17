@@ -69,9 +69,14 @@ defmodule UnicodeSecurity.Restrictions do
   @spec restriction_level(binary()) :: level()
   def restriction_level(input) do
     scalars = input |> Utf8.decode!() |> Enum.map(&elem(&1, 0))
+    level_scalars(scalars, Identifier.allowed_scalars?(scalars))
+  end
 
+  @doc false
+  @spec level_scalars([non_neg_integer()], boolean()) :: level()
+  def level_scalars(scalars, membership?) do
     cond do
-      not Identifier.allowed_scalars?(scalars) -> :unrestricted
+      not membership? -> :unrestricted
       Enum.all?(scalars, &(&1 <= 0x7F)) -> :ascii
       nonempty?(Scripts.resolved_set(scalars)) -> :single_script_restrictive
       true -> mixed_level(Scripts.resolved_without_latin(scalars))

@@ -21,6 +21,51 @@ defmodule UnicodeSecurity do
           | :minimally_restrictive
           | :unrestricted
 
+  @doc """
+  Analyzes an identifier and returns original-input facts and policy findings.
+
+  Requires `type: :username`, `:tenant_slug`, or `:organization_name`; domains
+  are not supported in this milestone. `policy` selects `:strict`, `:default`,
+  or `:permissive`. Usernames and tenant slugs default to `:default`;
+  organization names default to `:permissive`. Optional `allowed_scripts` and
+  `denied_scripts` accept ordinary script atoms from the pinned data. An omitted
+  allowlist permits all scripts; an explicit empty list permits neutral scalars
+  only. Multivalued Script_Extensions pass if a permitted candidate survives.
+
+  Username syntax accepts letters, marks, decimal digits and ASCII `_-.`;
+  tenant slugs accept the same categories with only `-` punctuation. Organization
+  names additionally accept pinned whitespace and punctuation categories.
+  There are no first-character rules. Join controls receive normative context
+  checks. Input is preserved without trimming, folding or rewriting.
+
+  Raw restriction facts remain unchanged. Restricted-character findings report
+  original raw scalars independently of canonical membership, except username
+  `_-.` and tenant `-`. Those exceptions also extend policy membership using
+  punctuation-separated runs, preventing composition across separators.
+  Organization whitespace and punctuation allowances affect syntax only.
+
+  Every binary with valid configuration returns `UnicodeSecurity.Result`,
+  including empty, malformed UTF-8 and input over 4,096 original bytes. Partial
+  results retain `nil` facts. Empty input is fully analyzed with a high-severity
+  finding. Positions are original zero-based byte/scalar indexes; global
+  findings follow positional findings. The highest severity determines verdict.
+  This check does not detect collisions or establish identity or authorization.
+
+  Raises `ArgumentError` for nonbinary input or invalid configuration, including
+  missing type, duplicate/unknown options, malformed script lists and overlapping
+  allow/deny lists. Configuration is validated before content analysis.
+
+  ## Examples
+
+      iex> UnicodeSecurity.check("alice-smith", type: :username).verdict
+      :safe
+
+      iex> UnicodeSecurity.check("", type: :username).verdict
+      :dangerous
+  """
+  @spec check(binary(), keyword()) :: UnicodeSecurity.Result.t()
+  defdelegate check(input, options), to: UnicodeSecurity.Check
+
   @doc "Returns the Unicode version used by the compiled data; see `data_manifest/0` for draft status."
   @spec unicode_version() :: binary()
   def unicode_version, do: "18.0.0"

@@ -8,7 +8,15 @@ defmodule UnicodeSecurity.Scripts do
   def scripts(input) do
     input
     |> Utf8.decode!()
-    |> Enum.map(fn {code, _offset} -> Data.script(code) end)
+    |> Enum.map(&elem(&1, 0))
+    |> scripts_scalars()
+  end
+
+  @doc false
+  @spec scripts_scalars([non_neg_integer()]) :: [atom()]
+  def scripts_scalars(scalars) do
+    scalars
+    |> Enum.map(&Data.script/1)
     |> Enum.uniq()
     |> Enum.sort()
   end
@@ -18,6 +26,13 @@ defmodule UnicodeSecurity.Scripts do
     input
     |> Utf8.decode!()
     |> Enum.map(&elem(&1, 0))
+    |> mixed_scalars?()
+  end
+
+  @doc false
+  @spec mixed_scalars?([non_neg_integer()]) :: boolean()
+  def mixed_scalars?(scalars) do
+    scalars
     |> resolved_set()
     |> empty?()
   end
