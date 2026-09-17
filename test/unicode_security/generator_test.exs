@@ -12,6 +12,21 @@ defmodule UnicodeSecurity.GeneratorTest do
     assert File.read!(output) == File.read!("lib/unicode_security/data/identifier.ex")
   end
 
+  test "reproduces pinned profile and composition modules and validates the whole lock before writes" do
+    for {generate, name} <- [
+          {&Generator.generate_profile!/2, "profile.ex"},
+          {&Generator.generate_composition!/2, "composition.ex"}
+        ] do
+      path = generate.("priv/unicode/18.0.0-draft", temporary_directory())
+      assert File.read!(path) == File.read!("lib/unicode_security/data/#{name}")
+      root = temporary_directory()
+      sources = write_sources!(root)
+      File.write!(Path.join(sources, "NormalizationTest.txt"), "tampered")
+      assert_raise ArgumentError, fn -> generate.(sources, Path.join(root, "output")) end
+      refute File.exists?(Path.join(root, "output"))
+    end
+  end
+
   test "rejects identifier rescues with a singleton Restricted starter" do
     statuses = [{0x1200, 0x1200, :allowed}, {0xAC00, 0xD7A3, :allowed}]
 
@@ -229,6 +244,8 @@ defmodule UnicodeSecurity.GeneratorTest do
           "scripts.ex",
           "identifier.ex",
           "numbers.ex",
+          "profile.ex",
+          "composition.ex",
           "manifest.ex"
         ] do
       path = Path.join(root, "lib/unicode_security/data/#{name}")
@@ -257,6 +274,8 @@ defmodule UnicodeSecurity.GeneratorTest do
           "scripts.ex",
           "identifier.ex",
           "numbers.ex",
+          "profile.ex",
+          "composition.ex",
           "manifest.ex"
         ],
         fn name ->
@@ -435,7 +454,22 @@ defmodule UnicodeSecurity.GeneratorTest do
           {"BidiBrackets", "0028; 0029; o\n0029; 0028; c\n"},
           {"BidiMirroring", "003C; 003E\n003E; 003C\n"},
           {"BidiTest", ""},
-          {"BidiCharacterTest", ""}
+          {"BidiCharacterTest", ""},
+          {"PropList", "0020; White_Space\n202E; Bidi_Control\n"},
+          {"DerivedJoiningType", "# @missing: 0000..10FFFF; Non_Joining\n0628; D\n"},
+          {"IndicSyllabicCategory", "# @missing: 0000..10FFFF; Other\n093E; Vowel_Dependent\n"},
+          {"DerivedNormalizationProps",
+           Enum.map_join(
+             [
+               "NFD_QC; Yes",
+               "NFC_QC; Yes",
+               "NFKD_QC; Yes",
+               "NFKC_QC; Yes",
+               "NFKC_CF; <code point>",
+               "NFKC_SCF; <code point>"
+             ],
+             &"# @missing: 0000..10FFFF; #{&1}\n"
+           ) <> "1000..1200; Full_Composition_Exclusion\n"}
         ] do
       header =
         if name in ["IdentifierStatus", "IdentifierType"],
@@ -475,6 +509,8 @@ defmodule UnicodeSecurity.GeneratorTest do
     Generator.generate_scripts!(source_directory, output_directory)
     Generator.generate_identifier!(source_directory, output_directory)
     Generator.generate_numbers!(source_directory, output_directory)
+    Generator.generate_profile!(source_directory, output_directory)
+    Generator.generate_composition!(source_directory, output_directory)
     Generator.generate_manifest!(source_directory, output_directory)
     root
   end

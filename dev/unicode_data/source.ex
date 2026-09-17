@@ -5,6 +5,30 @@ defmodule UnicodeSecurity.UnicodeData.Source do
 
   @sources [
     %{
+      name: "DerivedNormalizationProps.txt",
+      url: "https://www.unicode.org/Public/18.0.0/ucd/DerivedNormalizationProps.txt",
+      version: "18.0.0",
+      status: :draft
+    },
+    %{
+      name: "PropList.txt",
+      url: "https://www.unicode.org/Public/18.0.0/ucd/PropList.txt",
+      version: "18.0.0",
+      status: :draft
+    },
+    %{
+      name: "DerivedJoiningType.txt",
+      url: "https://www.unicode.org/Public/18.0.0/ucd/extracted/DerivedJoiningType.txt",
+      version: "18.0.0",
+      status: :draft
+    },
+    %{
+      name: "IndicSyllabicCategory.txt",
+      url: "https://www.unicode.org/Public/18.0.0/ucd/IndicSyllabicCategory.txt",
+      version: "18.0.0",
+      status: :draft
+    },
+    %{
       name: "IdentifierStatus.txt",
       url: "https://www.unicode.org/Public/draft/security/IdentifierStatus.txt",
       version: "18.0.0",

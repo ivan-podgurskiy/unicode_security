@@ -5,11 +5,45 @@ defmodule UnicodeSecurity.UnicodeData.Generator do
   alias UnicodeSecurity.UnicodeData.IdentifierParser
   alias UnicodeSecurity.UnicodeData.Packer
   alias UnicodeSecurity.UnicodeData.Parser
+  alias UnicodeSecurity.UnicodeData.ProfileGenerator
+  alias UnicodeSecurity.UnicodeData.ProfileParser
   alias UnicodeSecurity.UnicodeData.ScriptParser
   alias UnicodeSecurity.UnicodeData.Source
 
-  @source_names ["UnicodeData.txt", "DerivedCombiningClass.txt"]
   @output_name "normalization.ex"
+
+  @spec generate_profile!(Path.t(), Path.t()) :: Path.t()
+  def generate_profile!(source_directory, output_directory) do
+    Source.verify!(Source.sources(), source_directory, read_lock!(source_directory))
+    read = fn name -> File.read!(Path.join(source_directory, name)) end
+    categories = ProfileParser.categories!(read.("UnicodeData.txt"))
+    properties = ProfileParser.prop_list!(read.("PropList.txt"))
+    joining = ProfileParser.joining_types!(read.("DerivedJoiningType.txt"))
+    vowels = ProfileParser.vowels!(read.("IndicSyllabicCategory.txt"))
+    contents = ProfileGenerator.render_profile!(categories, properties, joining, vowels)
+    write_output!(output_directory, "profile.ex", contents)
+  end
+
+  @spec generate_composition!(Path.t(), Path.t()) :: Path.t()
+  def generate_composition!(source_directory, output_directory) do
+    Source.verify!(Source.sources(), source_directory, read_lock!(source_directory))
+
+    decompositions =
+      source_directory |> Path.join("UnicodeData.txt") |> File.read!() |> Parser.unicode_data!()
+
+    exclusions =
+      source_directory
+      |> Path.join("DerivedNormalizationProps.txt")
+      |> File.read!()
+      |> ProfileParser.exclusions!()
+
+    contents =
+      decompositions
+      |> ProfileGenerator.composition_pairs!(exclusions)
+      |> ProfileGenerator.render_composition!()
+
+    write_output!(output_directory, "composition.ex", contents)
+  end
 
   @spec generate_numbers!(Path.t(), Path.t()) :: Path.t()
   def generate_numbers!(source_directory, output_directory) do
@@ -181,13 +215,7 @@ defmodule UnicodeSecurity.UnicodeData.Generator do
 
   @spec generate_bidi!(Path.t(), Path.t()) :: Path.t()
   def generate_bidi!(source_directory, output_directory) do
-    verify_sources!(source_directory, [
-      "UnicodeData.txt",
-      "DerivedCoreProperties.txt",
-      "DerivedBidiClass.txt",
-      "BidiBrackets.txt",
-      "BidiMirroring.txt"
-    ])
+    verify_sources!(source_directory)
 
     tables =
       for {name, parser, packer} <- [
@@ -232,7 +260,7 @@ defmodule UnicodeSecurity.UnicodeData.Generator do
 
   @spec generate_confusables!(Path.t(), Path.t()) :: Path.t()
   def generate_confusables!(source_directory, output_directory) do
-    verify_sources!(source_directory, ["confusables.txt"])
+    verify_sources!(source_directory)
 
     {index, values} =
       source_directory
@@ -307,11 +335,8 @@ defmodule UnicodeSecurity.UnicodeData.Generator do
     output_path
   end
 
-  defp verify_sources!(source_directory, source_names \\ @source_names) do
-    lock = read_lock!(source_directory)
-    declarations = Enum.filter(Source.sources(), &(&1.name in source_names))
-    relevant_lock = Map.take(lock, source_names)
-    Source.verify!(declarations, source_directory, relevant_lock)
+  defp verify_sources!(source_directory) do
+    Source.verify!(Source.sources(), source_directory, read_lock!(source_directory))
   end
 
   defp read_lock!(source_directory) do

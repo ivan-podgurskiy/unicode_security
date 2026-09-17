@@ -37,6 +37,39 @@ defmodule UnicodeSecurity.NormalizationTest do
     assert rows == 20_171
   end
 
+  test "composes canonical pairs and Hangul from decoded scalars" do
+    assert Normalization.nfc_scalars([?e, 0x301]) == [0xE9]
+    assert Normalization.nfc_scalars([0x1100, 0x1161, 0x11A8]) == [0xAC01]
+  end
+
+  test "satisfies every official NFC invariant" do
+    rows =
+      Enum.reduce(UnicodeFixtures.normalization_rows(), 0, fn {line, [c1, c2, c3, c4, c5]},
+                                                              count ->
+        for {source, expected} <- [{c1, c2}, {c2, c2}, {c3, c2}, {c4, c4}, {c5, c4}] do
+          assert Normalization.nfc_scalars(scalars(source)) == scalars(expected),
+                 "NFC conformance failed at line #{line}"
+        end
+
+        count + 1
+      end)
+
+    assert rows == 20_171
+  end
+
+  test "honors blocking, exclusions, leading marks, and original-input-only limits" do
+    assert Normalization.nfc_scalars([]) == []
+    assert Normalization.nfc_scalars([0x301, 0x323, ?q]) == [0x323, 0x301, ?q]
+    assert Normalization.nfc_scalars([?A, 0x305, 0x301]) == [?A, 0x305, 0x301]
+    assert Normalization.nfc_scalars([?A, 0x323, 0x301]) == [0x1EA0, 0x301]
+    assert Normalization.nfc_scalars([0x915, 0x93C]) == [0x915, 0x93C]
+    assert Normalization.nfc_scalars([0x1D157, 0x1D165]) == [0x1D157, 0x1D165]
+    assert Normalization.nfc_scalars([0x1100, 0x301, 0x1161]) == [0x1100, 0x301, 0x1161]
+    assert Normalization.nfc_scalars(List.duplicate(?a, 4097)) == List.duplicate(?a, 4097)
+  end
+
+  defp scalars(binary), do: for(<<scalar::utf8 <- binary>>, do: scalar)
+
   test "matches the checked-in golden bytes across OTP versions" do
     actual =
       UnicodeFixtures.golden_corpus()

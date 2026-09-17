@@ -25,3 +25,10 @@ Mix.shell().info("generated #{Path.relative_to(identifier_path, project_root)}")
 
 numbers_path = Generator.generate_numbers!(source_directory, output_directory)
 Mix.shell().info("generated #{Path.relative_to(numbers_path, project_root)}")
+
+for path <- [
+      Generator.generate_profile!(source_directory, output_directory),
+      Generator.generate_composition!(source_directory, output_directory)
+    ] do
+  Mix.shell().info("generated #{Path.relative_to(path, project_root)}")
+end

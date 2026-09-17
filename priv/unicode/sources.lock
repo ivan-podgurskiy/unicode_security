@@ -1,4 +1,8 @@
 %{
+  "DerivedNormalizationProps.txt" => %{bytes: 1396877, sha256: "98ac7f67d985fe781e317f6182e885e94cabb0c314769e6dd73e48b226931ccd"},
+  "PropList.txt" => %{bytes: 149040, sha256: "f438f532e8737bb8a2702126cdf9c4af5e357c58c7acf9d9eb2fc7c1a1d955d6"},
+  "DerivedJoiningType.txt" => %{bytes: 41024, sha256: "e2408ff2c92b175b0f7bf62c989bbb54c7b077528fe31f8d69b96fa09e7d61ed"},
+  "IndicSyllabicCategory.txt" => %{bytes: 86842, sha256: "a2b3aacf6b3e7bad4ca351ef985d9543825e20280ff280c25f646d9bc4ce304c"},
   "IdentifierStatus.txt" => %{
     bytes: 148042,
     sha256: "5863c7d99ca18f213c41c7318aa5528bebfb6d32ec0f1d5944e37192c119aebd"

@@ -28,7 +28,8 @@ defmodule UnicodeSecurity.ProjectTest do
       assert path in packaged
     end
 
-    for name <- ~w(bidi confusables identifier manifest normalization numbers scripts) do
+    for name <-
+          ~w(bidi composition confusables identifier manifest normalization numbers profile scripts) do
       assert "lib/unicode_security/data/#{name}.ex" in packaged
     end
 

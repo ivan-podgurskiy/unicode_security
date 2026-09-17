@@ -87,6 +87,26 @@ defmodule UnicodeSecurity.SourceTest do
     end
   end
 
+  test "declares exactly four additional official draft Unicode 18 profile sources" do
+    sources = Source.sources()
+    assert length(sources) == 19
+
+    for {name, suffix} <- [
+          {"DerivedNormalizationProps.txt", "DerivedNormalizationProps.txt"},
+          {"PropList.txt", "PropList.txt"},
+          {"DerivedJoiningType.txt", "extracted/DerivedJoiningType.txt"},
+          {"IndicSyllabicCategory.txt", "IndicSyllabicCategory.txt"}
+        ] do
+      assert %{url: url, version: "18.0.0", status: :draft} =
+               Enum.find(sources, &(&1.name == name))
+
+      assert url == "https://www.unicode.org/Public/18.0.0/ucd/" <> suffix
+    end
+
+    {lock, []} = Code.eval_file("priv/unicode/sources.lock")
+    assert Source.verify!(sources, "priv/unicode/18.0.0-draft", lock) == :ok
+  end
+
   test "locks and verifies source bytes" do
     directory = temporary_directory()
 

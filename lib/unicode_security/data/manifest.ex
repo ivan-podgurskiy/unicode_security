@@ -63,6 +63,22 @@ defmodule UnicodeSecurity.Data.Manifest do
           status: :draft
         },
         %{
+          name: "DerivedJoiningType.txt",
+          url: "https://www.unicode.org/Public/18.0.0/ucd/extracted/DerivedJoiningType.txt",
+          version: "18.0.0",
+          bytes: 41_024,
+          sha256: "e2408ff2c92b175b0f7bf62c989bbb54c7b077528fe31f8d69b96fa09e7d61ed",
+          status: :draft
+        },
+        %{
+          name: "DerivedNormalizationProps.txt",
+          url: "https://www.unicode.org/Public/18.0.0/ucd/DerivedNormalizationProps.txt",
+          version: "18.0.0",
+          bytes: 1_396_877,
+          sha256: "98ac7f67d985fe781e317f6182e885e94cabb0c314769e6dd73e48b226931ccd",
+          status: :draft
+        },
+        %{
           name: "IdentifierStatus.txt",
           url: "https://www.unicode.org/Public/draft/security/IdentifierStatus.txt",
           version: "18.0.0",
@@ -79,11 +95,27 @@ defmodule UnicodeSecurity.Data.Manifest do
           status: :draft
         },
         %{
+          name: "IndicSyllabicCategory.txt",
+          url: "https://www.unicode.org/Public/18.0.0/ucd/IndicSyllabicCategory.txt",
+          version: "18.0.0",
+          bytes: 86_842,
+          sha256: "a2b3aacf6b3e7bad4ca351ef985d9543825e20280ff280c25f646d9bc4ce304c",
+          status: :draft
+        },
+        %{
           name: "NormalizationTest.txt",
           url: "https://www.unicode.org/Public/18.0.0/ucd/NormalizationTest.txt",
           version: "18.0.0",
           bytes: 2_863_708,
           sha256: "25a50d816764b04abfb4a646d3eb2b2a803284c3873d9a06757b94fe4513dde3",
+          status: :draft
+        },
+        %{
+          name: "PropList.txt",
+          url: "https://www.unicode.org/Public/18.0.0/ucd/PropList.txt",
+          version: "18.0.0",
+          bytes: 149_040,
+          sha256: "f438f532e8737bb8a2702126cdf9c4af5e357c58c7acf9d9eb2fc7c1a1d955d6",
           status: :draft
         },
         %{

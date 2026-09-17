@@ -1,6 +1,7 @@
 defmodule UnicodeSecurity.Normalization do
   @moduledoc false
 
+  alias UnicodeSecurity.Data.Composition
   alias UnicodeSecurity.Data.Normalization, as: Data
   alias UnicodeSecurity.Utf8
 
@@ -32,6 +33,47 @@ defmodule UnicodeSecurity.Normalization do
     |> Enum.flat_map(&decompose/1)
     |> reorder([], [])
   end
+
+  @doc false
+  @spec nfc_scalars([0..0x10FFFF]) :: [0..0x10FFFF]
+  def nfc_scalars(scalars), do: scalars |> nfd_scalars() |> recompose(nil, [], 0, [])
+
+  # Keep the starter separately so composing across intervening marks is linear.
+  defp recompose([], nil, _marks, _class, acc), do: Enum.reverse(acc)
+  defp recompose([], starter, marks, _class, acc), do: Enum.reverse(marks ++ [starter | acc])
+
+  defp recompose([scalar | rest], starter, marks, previous_class, acc) do
+    class = Data.combining_class(scalar)
+
+    composite =
+      if starter != nil and (previous_class == 0 or previous_class < class),
+        do: compose(starter, scalar)
+
+    cond do
+      composite != nil ->
+        recompose(rest, composite, marks, previous_class, acc)
+
+      class == 0 ->
+        flushed = if starter == nil, do: acc, else: marks ++ [starter | acc]
+        recompose(rest, scalar, [], 0, flushed)
+
+      starter == nil ->
+        recompose(rest, nil, [], class, [scalar | acc])
+
+      true ->
+        recompose(rest, starter, [scalar | marks], class, acc)
+    end
+  end
+
+  defp compose(leading, vowel) when leading in 0x1100..0x1112 and vowel in 0x1161..0x1175,
+    do: @s_base + ((leading - @l_base) * @v_count + vowel - @v_base) * @t_count
+
+  defp compose(syllable, trailing)
+       when syllable in 0xAC00..0xD7A3 and rem(syllable - @s_base, @t_count) == 0 and
+              trailing in 0x11A8..0x11C2,
+       do: syllable + trailing - @t_base
+
+  defp compose(first, second), do: Composition.compose(first, second)
 
   defp decompose(scalar) when scalar >= @s_base and scalar < @s_base + @s_count do
     index = scalar - @s_base

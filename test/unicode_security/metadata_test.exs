@@ -36,14 +36,24 @@ defmodule UnicodeSecurity.MetadataTest do
     verification = """
     "18.0.0" = UnicodeSecurity.unicode_version()
     34 = UnicodeSecurity.uts39_revision()
+    :lu = UnicodeSecurity.Data.Profile.category(?A)
+    :d = UnicodeSecurity.Data.Profile.joining_type(0x628)
+    [0xE9] = UnicodeSecurity.Normalization.nfc_scalars([?e, 0x301])
     %{release_status: :draft, sources: sources} = UnicodeSecurity.data_manifest()
-    15 = length(sources)
+    19 = length(sources)
     false = Code.ensure_loaded?(UnicodeSecurity.UnicodeData.Source)
     """
 
     # Load only the runtime BEAMs; dev modules sharing the build directory stay inaccessible.
     runtime_beams =
-      for module <- [UnicodeSecurity, UnicodeSecurity.Data.Manifest] do
+      for module <- [
+            UnicodeSecurity,
+            UnicodeSecurity.Data.Manifest,
+            UnicodeSecurity.Data.Profile,
+            UnicodeSecurity.Data.Composition,
+            UnicodeSecurity.Data.Normalization,
+            UnicodeSecurity.Normalization
+          ] do
         Path.join(beam_directory, Atom.to_string(module) <> ".beam")
       end
 
