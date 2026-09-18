@@ -4,10 +4,20 @@ defmodule UnicodeSecurity.ConfusablesTest do
 
   doctest UnicodeSecurity
 
+  alias UnicodeSecurity.Data.Bidi, as: BidiData
   alias UnicodeSecurity.Data.Confusables
   alias UnicodeSecurity.InvalidInputError
   alias UnicodeSecurity.Normalization
   alias UnicodeSecurity.Test.UnicodeFixtures
+
+  test "every ASCII prototype retains pinned MA mappings and normalization" do
+    for scalar <- 0..127 do
+      refute BidiData.default_ignorable?(scalar)
+      prototype = UnicodeSecurity.Data.Confusables.mapping(scalar) || [scalar]
+      expected = prototype |> List.to_string() |> Normalization.nfd() |> String.to_charlist()
+      assert UnicodeSecurity.Confusables.internal_skeleton([scalar]) == expected
+    end
+  end
 
   test "matches independent revision 34 golden bytes on every supported runtime" do
     rows =

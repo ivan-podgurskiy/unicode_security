@@ -84,3 +84,5 @@ jobs:
           MIX_ENV: dev
       - if: matrix.quality
         run: mix run bench/milestone_0.exs
+      - if: matrix.quality
+        run: mix run bench/milestone_2.exs

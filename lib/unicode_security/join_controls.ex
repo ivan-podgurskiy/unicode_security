@@ -25,6 +25,12 @@ defmodule UnicodeSecurity.JoinControls do
       |> Enum.filter(fn {code, _index} -> code in [0x200C, 0x200D] end)
       |> Enum.map(fn {_code, index} -> index end)
 
+    # Pinned canonical decomposition/composition cannot introduce a joiner.
+    # With no original joiner there is no context decision to make.
+    if indexes == [], do: [], else: invalid_normalized_indexes(scalars, indexes)
+  end
+
+  defp invalid_normalized_indexes(scalars, indexes) do
     scalars
     |> Normalization.nfc_scalars()
     |> Enum.map(&properties/1)

@@ -4,6 +4,32 @@ defmodule UnicodeSecurity.NormalizationTest do
   alias UnicodeSecurity.{InvalidInputError, Normalization}
   alias UnicodeSecurity.Test.UnicodeFixtures
 
+  test "pinned ASCII normalization is identity and cannot hide controls or MA mappings" do
+    scalars = Enum.to_list(0..127)
+    assert UnicodeSecurity.Normalization.nfd_scalars(scalars) == scalars
+    assert UnicodeSecurity.Normalization.nfc_scalars(scalars) == scalars
+
+    for scalar <- scalars do
+      assert UnicodeSecurity.Data.Normalization.decomposition(scalar) == nil
+      assert UnicodeSecurity.Data.Normalization.combining_class(scalar) == 0
+    end
+
+    assert UnicodeSecurity.skeleton("m") == "rn"
+    assert UnicodeSecurity.skeleton(<<0, ?m>>) == "rn"
+  end
+
+  test "pinned canonical mappings cannot introduce or compose join controls" do
+    for joiner <- [0x200C, 0x200D] do
+      assert UnicodeSecurity.Data.Normalization.decomposition(joiner) == nil
+      assert UnicodeSecurity.Data.Normalization.combining_class(joiner) == 0
+    end
+
+    for scalar <- 0..0x10FFFF do
+      mapping = UnicodeSecurity.Data.Normalization.decomposition(scalar) || []
+      refute Enum.any?(mapping, &(&1 in [0x200C, 0x200D]))
+    end
+  end
+
   for {name, input} <- [
         {"nil", nil},
         {"an integer", 42},

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Original-input `check/2` Results and structured Reasons for username, tenant slug,
+  and organization name profiles, with strict/default/permissive policies, script
+  overrides, deterministic positions/order and explicit punctuation exceptions.
+- Normative UTS #39 revision 34 join-control contexts on internal pinned NFC;
+  four additional locked draft sources bring provenance to 19 sources.
+- Complete literal versioned policy goldens, source-free runtime acceptance and
+  warmed profile benchmarks including ASCII MA mappings and 4,096-byte cases.
+
 - UTS #39 revision 34 mixed-decimal-number detection and ordered restriction levels,
   using the canonically closed General Security Profile, augmented script sets, and
   the frozen UAX #31 revision 44 Recommended scripts; no policy or syntax exceptions.
@@ -43,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Unicode 18.0.0 sources remain draft; this milestone is not releasable.
 - Skeletons are comparison keys only, never replacements or authorization
-  decisions. Policy, profiles, domains/IDNA, batch APIs, and Ecto are not included.
+  decisions. Domains/IDNA, comparison/collision and batch APIs, and Ecto are planned
+  later; `type: :domain` remains unsupported.
 
 [0.1.0]: https://github.com/ivan-podgurskiy/unicode_security/releases/tag/v0.1.0

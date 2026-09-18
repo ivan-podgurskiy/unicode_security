@@ -29,9 +29,13 @@ defmodule UnicodeSecurity.Normalization do
   @doc false
   @spec nfd_scalars([0..0x10FFFF]) :: [0..0x10FFFF]
   def nfd_scalars(scalars) do
-    scalars
-    |> Enum.flat_map(&decompose/1)
-    |> reorder([], [])
+    # Every pinned ASCII scalar is undecomposable with CCC0, including controls.
+    # This only skips canonical normalization; bidi/control/MA work stays intact.
+    if Enum.all?(scalars, &(&1 <= 0x7F)) do
+      scalars
+    else
+      scalars |> Enum.flat_map(&decompose/1) |> reorder([], [])
+    end
   end
 
   @doc false

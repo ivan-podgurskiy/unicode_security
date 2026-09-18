@@ -7,6 +7,15 @@ defmodule UnicodeSecurity.Confusables do
   alias UnicodeSecurity.Normalization
   alias UnicodeSecurity.Utf8
 
+  # Cache fixed ASCII prototypes from pinned tables. Controls still pass through
+  # Bidi; MA mappings and final NFD remain mandatory.
+  @ascii_prototypes (for scalar <- 0..127 do
+                       if BidiData.default_ignorable?(scalar),
+                         do: [],
+                         else: Data.mapping(scalar) || [scalar]
+                     end)
+                    |> List.to_tuple()
+
   @spec skeleton(binary()) :: binary()
   def skeleton(input) do
     input
@@ -32,8 +41,13 @@ defmodule UnicodeSecurity.Confusables do
   def internal_skeleton(scalars) do
     scalars
     |> Normalization.nfd_scalars()
-    |> Enum.reject(&BidiData.default_ignorable?/1)
-    |> Enum.flat_map(fn scalar -> Data.mapping(scalar) || [scalar] end)
+    |> Enum.flat_map(&prototype/1)
     |> Normalization.nfd_scalars()
+  end
+
+  defp prototype(scalar) when scalar <= 0x7F, do: elem(@ascii_prototypes, scalar)
+
+  defp prototype(scalar) do
+    if BidiData.default_ignorable?(scalar), do: [], else: Data.mapping(scalar) || [scalar]
   end
 end

@@ -46,6 +46,10 @@ defmodule UnicodeSecurity.ProjectTest do
     assert Code.ensure_loaded?(UnicodeSecurity)
 
     for {name, arity} <- [
+          check: 2,
+          identifier_status: 1,
+          identifier_types: 1,
+          allowed_identifier?: 1,
           skeleton: 1,
           scripts: 1,
           mixed_script?: 1,

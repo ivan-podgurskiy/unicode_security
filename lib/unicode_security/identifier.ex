@@ -39,12 +39,14 @@ defmodule UnicodeSecurity.Identifier do
   # Internal entry point for callers that already validated/decoded the original input.
   @spec allowed_scalars?([non_neg_integer()]) :: boolean()
   def allowed_scalars?(scalars) do
-    {leading, segments} =
-      scalars
-      |> Normalization.nfd_scalars()
-      |> segments()
-
-    Enum.all?(leading, &allowed_scalar?/1) and suffix_allowed?(segments)
+    # Pinned ASCII has no canonical decomposition or all-ASCII rescue sequence.
+    # Retain exact status checks: ASCII controls/punctuation are not all Allowed.
+    if Enum.all?(scalars, &(&1 <= 0x7F)) do
+      Enum.all?(scalars, &allowed_scalar?/1)
+    else
+      {leading, segments} = scalars |> Normalization.nfd_scalars() |> segments()
+      Enum.all?(leading, &allowed_scalar?/1) and suffix_allowed?(segments)
+    end
   end
 
   defp segments(scalars), do: segments(scalars, [], [], nil)

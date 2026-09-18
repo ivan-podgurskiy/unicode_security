@@ -2,7 +2,59 @@ defmodule UnicodeSecurity.CheckTest do
   use ExUnit.Case, async: true
   use ExUnitProperties
 
+  alias UnicodeSecurity.Data.Identifier, as: IdentifierData
   alias UnicodeSecurity.{Policy, Profile, Result}
+
+  test "version 1 golden results preserve complete literal public contracts" do
+    {%{version: 1, cases: cases}, []} = Code.eval_file("test/fixtures/golden/check_v1.term")
+
+    for {label, input, options, expected} <- cases do
+      assert UnicodeSecurity.check(input, options) == expected, label
+    end
+  end
+
+  test "ASCII membership includes every pinned status and control edge" do
+    allowed =
+      MapSet.new(
+        [39, 45, 46, 58, 95] ++
+          Enum.to_list(48..57) ++ Enum.to_list(65..90) ++ Enum.to_list(97..122)
+      )
+
+    for scalar <- 0..127 do
+      for candidate <- IdentifierData.rescues(scalar) do
+        refute Enum.all?(candidate, &(&1 <= 127))
+      end
+
+      input = <<scalar>>
+      assert UnicodeSecurity.allowed_identifier?(input) == MapSet.member?(allowed, scalar)
+
+      for type <- [:username, :tenant_slug, :organization_name],
+          preset <- [:strict, :default, :permissive] do
+        result = UnicodeSecurity.check(input <> "m" <> input, type: type, policy: preset)
+        assert_facts(result)
+        positional = Enum.reject(result.reasons, &is_nil(&1.byte_offset))
+        first = Enum.filter(positional, &(&1.byte_offset == 0))
+        last = Enum.filter(positional, &(&1.byte_offset == 2))
+
+        assert Enum.map(first, &{&1.code, &1.severity, &1.details}) ==
+                 Enum.map(last, &{&1.code, &1.severity, &1.details})
+
+        assert Enum.all?(last, &(&1.codepoint_index == 2))
+      end
+    end
+  end
+
+  test "repeated joiners retain independently valid contexts and original positions" do
+    result = UnicodeSecurity.check("क्\u200Dकa\u200D", type: :username)
+
+    assert [%{byte_offset: 13, codepoint_index: 5, details: %{codepoint: 0x200D}}] =
+             Enum.filter(result.reasons, &(&1.code == :invalid_join_control_context))
+
+    assert Enum.map(
+             Enum.filter(result.reasons, &(&1.code == :default_ignorable)),
+             & &1.byte_offset
+           ) == [6, 13]
+  end
 
   test "safe identifiers preserve original input and standard facts" do
     for type <- [:username, :tenant_slug, :organization_name],

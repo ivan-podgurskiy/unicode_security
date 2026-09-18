@@ -1,7 +1,7 @@
 # UnicodeSecurity
 
 Pinned Unicode normalization, confusable comparison keys, script detection, and
-identifier security properties for Elixir.
+identifier security properties and policy checks for Elixir.
 
 > **Development status:** Unicode 18 data is currently draft. This package is not
 > releasable until the final Unicode 18 data is published and pinned.
@@ -66,9 +66,160 @@ Nonbinary input raises `ArgumentError`. Malformed UTF-8 and oversized inputs rai
 `UnicodeSecurity.InvalidInputError` with `reason` and a zero-based `byte_offset`;
 oversized inputs report offset 4,096. Generated output may exceed 4,096 bytes.
 
-Policy verdicts, application-specific identifier syntax, IDNA/domain handling,
-pairwise classification, collection/batch APIs, and Ecto integration are outside
-this milestone. The package does not decide whether an identifier is safe.
+IDNA/domain handling, pairwise classification, collection/batch APIs, and Ecto
+integration are planned later. Use the policy checks below for supported profiles.
+
+## Policy checks
+
+`check/2` analyzes untrusted original input without trimming, case folding,
+rewriting, or changing the stored name. Applications choose a profile and decide
+how to handle the returned verdict and reasons. A safe verdict describes this
+policy check; it does not establish identity, intent, authorization, or uniqueness.
+Skeleton equality is only a comparison signal. Keep the original value and version
+any persisted skeletons; comparison, collision and batch APIs are planned later.
+
+```elixir
+UnicodeSecurity.check("alice-smith", type: :username).verdict
+#=> :safe
+
+UnicodeSecurity.check("pay\u200Dpal", type: :username).verdict
+#=> :dangerous
+
+UnicodeSecurity.check("Acme & Co.", type: :organization_name).verdict
+#=> :suspicious
+
+UnicodeSecurity.check("раypal", type: :username, allowed_scripts: [:latin]).verdict
+#=> :dangerous
+```
+
+The required `type` is `:username`, `:tenant_slug`, or `:organization_name`.
+`:domain` raises `ArgumentError` until the dedicated IDNA/domain pipeline lands.
+Ecto integration is also planned later. Profiles have no first-character,
+case, length-in-characters, or business naming rules:
+
+| Type | Accepted syntax | Identifier_Status exceptions | Default policy |
+| --- | --- | --- | --- |
+| `:username` | Unicode letters L*, marks M*, decimal digits Nd; ASCII `_-.` | `_-.` | `:default` |
+| `:tenant_slug` | L*, M*, Nd; ASCII `-` | `-` | `:default` |
+| `:organization_name` | L*, M*, Nd; pinned White_Space; punctuation Pc/Pd/Ps/Pe/Pi/Pf/Po | none | `:permissive` |
+
+ZWJ and ZWNJ use the normative UTS #39 revision 34 §3.1.1.1 context rules on
+internal pinned NFC, rather than generic syntax or IDNA CONTEXTJ rules. Internal
+NFC is implementation support, not a public normalization API. A valid join context
+suppresses only `invalid_join_control_context`: joiners still produce Restricted
+and default-ignorable findings. Organization whitespace syntax also preserves all
+status and control findings. Symbols and other unsupported categories produce
+`profile_syntax`. Even ASCII input can contain restricted characters or MA mappings.
+
+Raw facts (`scripts`, `mixed_script?`, `mixed_number?`, `restriction_level`,
+`skeleton`) retain the standards primitive meanings. Per-scalar restrictions refer
+to the exact original scalars. Thus `"ĕ"` has raw Restricted/Uncommon_Use status
+and a restricted-character finding, while `"e\u0306"` uses Allowed scalars and
+has no such finding; both have canonically allowed membership and equal skeletons.
+The default verdicts are dangerous and safe, respectively. Permissive makes the
+composed form suspicious. Organization `"Acme & Co."` permits spaces and `&`
+syntactically but reports their raw Restricted status, making it suspicious under
+its default permissive preset.
+
+These are deliberate UTS #39 policy-layer modifications: username `_-.` and tenant
+`-` are explicit status exceptions and extend policy membership by checking runs
+separated by exception punctuation. Separators remain normalization boundaries,
+so Hangul Jamo or combining sequences cannot compose across punctuation. The raw
+restriction level is preserved; the below-policy decision uses the extended
+membership. Organization syntax permissions never extend status membership.
+Raw scalar diagnostic restrictions are independent of whole-string canonical
+closure. Standards primitives themselves add no profile exceptions.
+
+All three policies work with all three types. Ordered restriction levels are
+`:ascii`, `:single_script_restrictive`, `:highly_restrictive`,
+`:moderately_restrictive`, `:minimally_restrictive`, `:unrestricted`. Minimums are
+`:highly_restrictive` for strict, `:moderately_restrictive` for default, and
+`:minimally_restrictive` for permissive. Mixed-number findings remain independent.
+
+| Reason code | Details | Strict | Default | Permissive |
+| --- | --- | --- | --- | --- |
+| `invalid_utf8` | `%{invalid_byte: integer}` | critical | critical | critical |
+| `input_too_long` | `%{actual_bytes: integer, maximum_bytes: 4096}` | critical | critical | critical |
+| `empty_input` | `%{}` | high | high | high |
+| `profile_syntax` | `%{rule: :whitespace \| :punctuation \| :unsupported_category, codepoint: scalar}` | high | high | medium |
+| `restricted_character` | `%{codepoint: scalar, identifier_types: sorted_types}` | high | high | medium |
+| `invalid_join_control_context` | `%{codepoint: scalar}` | high | high | medium |
+| `disallowed_script` | `%{script: ordinary_script_atom}` | high | high | medium |
+| `denied_script` | `%{script: ordinary_script_atom}` | high | high | medium |
+| `default_ignorable` | `%{codepoint: scalar}` | critical | high | high |
+| `bidi_control` | `%{codepoint: scalar}` | critical | high | high |
+| `mixed_scripts` | `%{scripts: sorted_observed_scripts_without_common_inherited}` | high | medium | low |
+| `mixed_numbers` | `%{zero_codepoints: sorted_unique_decimal_zero_scalars}` | high | medium | low |
+| `restriction_level_below_policy` | `%{actual: raw_level, minimum: policy_minimum}` | high | medium | low |
+
+The highest severity determines verdict: no findings or only info → safe;
+low/medium → suspicious; high/critical → dangerous. Current checks emit the 13
+codes above, no collision or generic confusable finding. Use codes and structured
+details for logic. Messages are static, concise text, never the entire untrusted
+input, and are not a localization or parsing API.
+
+`UnicodeSecurity.Result` preserves `input`, `type`, effective preset `policy`,
+`unicode_version: "18.0.0"`, and `domain: nil`. Every binary with valid configuration
+returns a Result, including malformed or oversized input. More than 4,096 original
+bytes is rejected before decoding with one critical reason at byte 4,096 and a nil
+scalar index. Invalid UTF-8 returns one critical reason at the decoder's original
+byte offset and a nil scalar index. Both have `valid_input?: false` and nil
+`scripts`, `mixed_script?`, `mixed_number?`, `restriction_level`, `skeleton`.
+Empty input is valid UTF-8: `valid_input?: true`, empty scripts/skeleton, false mixed
+flags and `:ascii` level, plus a high reason at byte/scalar index zero. A false
+`valid_input?` describes decoding/size failure; policy danger does not make it false.
+
+Scalar reasons have original zero-based byte offsets and scalar indexes, not
+normalized or grapheme positions. Global mixed and below-policy findings have nil
+positions and follow all positional reasons. Sorting is byte offset, code atom,
+then deterministic details (including script atom/codepoint ties); global findings
+sort by code and details. Duplicate offset/code/details findings are removed.
+
+Configuration is validated before content. Nonbinary input, missing/unsupported
+type or policy, unknown/duplicate options, malformed keyword/list values, unknown
+script atoms, or intersecting allow/deny lists raise `ArgumentError`. Allowed keys
+are only `type`, `policy`, `allowed_scripts`, `denied_scripts`. Script lists are
+proper lists, deduplicated and sorted; no input-derived atoms are created.
+
+Script overrides use ordinary Script_Extensions (falling back to Script),
+independently of UTS #39 augmented mixed-script/restriction facts. An omitted
+allowlist is unrestricted; explicit `allowed_scripts: []` permits only neutral
+scalars. Exactly Common/Inherited-only candidates are neutral. Listing `:common`
+or `:inherited` does not authorize other scripts. Intersect each non-neutral
+candidate set with the allowlist and then subtract denied scripts. One surviving
+candidate accepts a multivalued scalar; otherwise emit one finding per excluded
+candidate, with original positions. For example, `"ー"` has Hiragana/Katakana
+extensions: denying only Hiragana passes, denying both produces two findings.
+U+0301 has multivalued pinned extensions and is not neutral solely because its
+ordinary Script is Inherited. Synthetic `:jpan`, `:kore`, `:hanb`, `:hntl` names
+are not accepted options. The supported closed ordinary names are listed below.
+
+```text
+:adlam, :ahom, :anatolian_hieroglyphs, :arabic, :armenian, :avestan, :balinese, :bamum,
+:bassa_vah, :batak, :bengali, :beria_erfe, :bhaiksuki, :bopomofo, :brahmi, :braille, :buginese,
+:buhid, :canadian_aboriginal, :carian, :caucasian_albanian, :chakma, :cham, :cherokee,
+:chorasmian, :common, :coptic, :cuneiform, :cypriot, :cypro_minoan, :cyrillic, :deseret,
+:devanagari, :dives_akuru, :dogra, :duployan, :egyptian_hieroglyphs, :elbasan, :elymaic,
+:ethiopic, :garay, :georgian, :glagolitic, :gothic, :grantha, :greek, :gujarati,
+:gunjala_gondi, :gurmukhi, :gurung_khema, :han, :hangul, :hanifi_rohingya, :hanunoo, :hatran,
+:hebrew, :hiragana, :imperial_aramaic, :inherited, :inscriptional_pahlavi,
+:inscriptional_parthian, :javanese, :jurchen, :kaithi, :kannada, :katakana,
+:katakana_or_hiragana, :kawi, :kayah_li, :kharoshthi, :khitan_small_script, :khmer, :khojki,
+:khudawadi, :kirat_rai, :lao, :latin, :lepcha, :limbu, :linear_a, :linear_b, :lisu, :lycian,
+:lydian, :mahajani, :makasar, :malayalam, :mandaic, :manichaean, :marchen, :masaram_gondi,
+:medefaidrin, :meetei_mayek, :mende_kikakui, :meroitic_cursive, :meroitic_hieroglyphs, :miao,
+:modi, :mongolian, :mro, :multani, :myanmar, :nabataean, :nag_mundari, :nandinagari,
+:new_tai_lue, :newa, :nko, :nushu, :nyiakeng_puachue_hmong, :ogham, :ol_chiki, :ol_onal,
+:old_hungarian, :old_italic, :old_north_arabian, :old_permic, :old_persian, :old_sogdian,
+:old_south_arabian, :old_turkic, :old_uyghur, :oriya, :osage, :osmanya, :pahawh_hmong,
+:palmyrene, :pau_cin_hau, :phags_pa, :phoenician, :proto_cuneiform, :psalter_pahlavi, :rejang,
+:runic, :samaritan, :saurashtra, :seal, :sharada, :shavian, :siddham, :sidetic, :signwriting,
+:sinhala, :sogdian, :sora_sompeng, :soyombo, :sundanese, :sunuwar, :syloti_nagri, :syriac,
+:tagalog, :tagbanwa, :tai_le, :tai_tham, :tai_viet, :tai_yo, :takri, :tamil, :tangsa, :tangut,
+:telugu, :thaana, :thai, :tibetan, :tifinagh, :tirhuta, :todhri, :tolong_siki, :toto,
+:tulu_tigalari, :ugaritic, :unknown, :vai, :vithkuqi, :wancho, :warang_citi, :yezidi, :yi,
+:zanabazar_square
+```
 
 ## Script detection
 
@@ -223,7 +374,10 @@ Identifier properties come from the pinned draft `IdentifierStatus.txt` and
 `IdentifierType.txt` files. The bidi inputs are `extracted/DerivedBidiClass.txt` (including unassigned-code-point
 defaults), `BidiBrackets.txt`, `BidiMirroring.txt`, and `DerivedCoreProperties.txt`.
 The existing `UnicodeData.txt` also supplies nonspacing/enclosing mark categories.
-All have versioned Unicode 18.0.0 UCD URLs in the manifest. The exact
+All have versioned Unicode 18.0.0 UCD URLs in the manifest. The 19 locked sources
+also include DerivedNormalizationProps.txt, PropList.txt,
+extracted/DerivedJoiningType.txt, and IndicSyllabicCategory.txt for pinned NFC
+composition, whitespace, bidi controls, joining types and Indic join contexts. The exact
 `BidiMirroring-18.0.0.txt` source retains an upstream comment identifying its
 carried-forward Unicode 17 repertoire; that comment has not been rewritten.
 
@@ -234,9 +388,10 @@ bytes. All 6,712 MA records verify the prototype transform, alongside the full
 normalization corpus and canonical-equivalence/idempotence properties applicable
 to each algorithm.
 
-The compatibility matrix covers Ubuntu Elixir/OTP 1.14/25, 1.17/26, 1.18/27,
-1.19/28, and 1.20/29, plus macOS and Windows 1.20/29. Every combination runs
-the same normalization conformance and fixed golden-output tests. The primary
+The configured compatibility matrix covers Ubuntu Elixir/OTP 1.14/25, 1.17/26, 1.18/27,
+1.19/28, and 1.20/29, plus macOS and Windows 1.20/29. Hosted matrix results remain pending an authorized remote run. Local minimum
+compatibility verification uses Elixir 1.14 / OTP 26; it is not OTP 25 evidence.
+Every configured combination runs the same normalization conformance and fixed golden-output tests. The primary
 Ubuntu 1.20/29 job also runs the quality gate:
 
 ```sh
@@ -250,11 +405,15 @@ mix dialyzer --format github
 mix docs --warnings-as-errors
 mix hex.build
 mix run bench/milestone_0.exs
+mix run bench/milestone_2.exs
 ```
 
 The benchmark warms each case and reports medians over 1,000 samples plus
 generated source and compiled BEAM sizes. Its fixed inputs make runs comparable;
-timing thresholds are not enforced across machines. Compile time can be measured
+timing thresholds are not enforced across machines. Milestone 2 targets a warmed
+64-byte ASCII `check/2` median below 100 µs and includes both repeated MA-mapped
+ASCII and varied profile syntax, international names and 4,096-byte worst cases.
+Compile time can be measured
 with `time mix compile --force --warnings-as-errors`. Inspect the built Hex
 archive before release; it contains runtime source, generated tables, package
 configuration, and public documentation, with a target below 5 MB unpacked.
@@ -271,7 +430,7 @@ mix run scripts/check_release_data.exs
 
 <!-- A future release workflow must run scripts/check_release_data.exs before
 publication. Do not run this intentional draft-data failure in ordinary CI.
-Milestone 0 has no publish workflow and must not be tagged or published. -->
+This development milestone has no publish workflow and must not be tagged or published. -->
 
 The release check first verifies generated data, then exits with
 `release blocked: Unicode 18.0.0 data status is draft`. It must continue to fail

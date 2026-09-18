@@ -8,7 +8,7 @@ Those data and specifications are copyright Unicode, Inc. and are distributed
 under the Unicode License v3 reproduced below. The package includes derived
 normalization (including NFC composition), confusables, script, decimal-number,
 identifier-property, and profile-property tables
-and a provenance manifest. The Recommended script set is derived from UAX #31
+and a provenance manifest for 19 locked sources. The Recommended script set is derived from UAX #31
 revision 44, Table 5 (Unicode 18.0.0 proposed). Raw source files
 and the normalization conformance corpus are development inputs and are not
 included in the Hex package. Profile properties use the pinned UnicodeData.txt
@@ -18,7 +18,7 @@ IndicSyllabicCategory.txt Vowel_Dependent. NFC composition pairs use
 DerivedNormalizationProps.txt Full_Composition_Exclusion and UnicodeData.txt
 canonical mappings, with Hangul handled algorithmically per UAX #15 revision 58.
 
-Milestone 0 pins **draft Unicode 18.0.0** and targets UTS #39 revision 34.
+This package pins **draft Unicode 18.0.0** and targets UTS #39 revision 34.
 `UnicodeSecurity.data_manifest/0` records the precise source URLs, versions,
 draft statuses, byte sizes, and SHA-256 hashes. This attribution does not imply
 that Unicode, Inc. endorses the package or that the draft data is final.

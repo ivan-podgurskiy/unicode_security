@@ -41,6 +41,13 @@ defmodule UnicodeSecurity.MetadataTest do
     [0xE9] = UnicodeSecurity.Normalization.nfc_scalars([?e, 0x301])
     %{release_status: :draft, sources: sources} = UnicodeSecurity.data_manifest()
     19 = length(sources)
+    %{__struct__: UnicodeSecurity.Result,verdict: :safe, skeleton: "rn", reasons: []} =
+      UnicodeSecurity.check("m", type: :username)
+    %{__struct__: UnicodeSecurity.Result,verdict: :dangerous, valid_input?: false,
+      reasons: [%{__struct__: UnicodeSecurity.Reason,code: :invalid_utf8, details: %{invalid_byte: 255}}]} =
+      UnicodeSecurity.check(<<255>>, type: :tenant_slug)
+    %{__struct__: UnicodeSecurity.Result,policy: :permissive, verdict: :suspicious} =
+      UnicodeSecurity.check("Acme & Co.", type: :organization_name)
     false = Code.ensure_loaded?(UnicodeSecurity.UnicodeData.Source)
     """
 
@@ -52,7 +59,28 @@ defmodule UnicodeSecurity.MetadataTest do
             UnicodeSecurity.Data.Profile,
             UnicodeSecurity.Data.Composition,
             UnicodeSecurity.Data.Normalization,
-            UnicodeSecurity.Normalization
+            UnicodeSecurity.Normalization,
+            UnicodeSecurity.Result,
+            UnicodeSecurity.Reason,
+            UnicodeSecurity.Check,
+            UnicodeSecurity.Policy,
+            UnicodeSecurity.Profile,
+            UnicodeSecurity.JoinControls,
+            UnicodeSecurity.Utf8,
+            UnicodeSecurity.InvalidInputError,
+            UnicodeSecurity.Identifier,
+            UnicodeSecurity.Restrictions,
+            UnicodeSecurity.Scripts,
+            UnicodeSecurity.Confusables,
+            UnicodeSecurity.Bidi,
+            UnicodeSecurity.Bidi.Explicit,
+            UnicodeSecurity.Bidi.Weak,
+            UnicodeSecurity.Bidi.Brackets,
+            UnicodeSecurity.Data.Bidi,
+            UnicodeSecurity.Data.Identifier,
+            UnicodeSecurity.Data.Numbers,
+            UnicodeSecurity.Data.Scripts,
+            UnicodeSecurity.Data.Confusables
           ] do
         Path.join(beam_directory, Atom.to_string(module) <> ".beam")
       end

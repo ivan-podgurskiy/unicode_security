@@ -3,7 +3,7 @@ defmodule UnicodeSecurity do
   Unicode identifier security primitives backed by pinned Unicode data.
 
   Provides `skeleton/1`, script, number, and restriction-level detection, identifier
-  properties, and compiled-data
+  properties, `check/2` policy Results/Reasons for three profiles, and compiled-data
   metadata. A skeleton is a comparison key only. It must never serve as a canonical
   identifier, replacement value, or authorization decision. Matching keys do not
   establish identity or intent.
@@ -48,7 +48,9 @@ defmodule UnicodeSecurity do
   including empty, malformed UTF-8 and input over 4,096 original bytes. Partial
   results retain `nil` facts. Empty input is fully analyzed with a high-severity
   finding. Positions are original zero-based byte/scalar indexes; global
-  findings follow positional findings. The highest severity determines verdict.
+  findings follow positional findings. Reasons sort by original byte offset, code,
+  and deterministic details. See `UnicodeSecurity.Reason` for all codes, details
+  and severities. The highest severity determines verdict.
   This check does not detect collisions or establish identity or authorization.
 
   Raises `ArgumentError` for nonbinary input or invalid configuration, including

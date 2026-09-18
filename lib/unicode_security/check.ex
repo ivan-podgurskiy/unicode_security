@@ -66,25 +66,49 @@ defmodule UnicodeSecurity.Check do
 
   defp analyze(decoded, policy, result) do
     scalars = Enum.map(decoded, &elem(&1, 0))
-    scripts = Scripts.scripts_scalars(scalars)
-    mixed_script? = Scripts.mixed_scalars?(scalars)
+    # Observed scripts, intersections and decimal systems are duplicate-invariant.
+    distinct_scalars = Enum.uniq(scalars)
+    scripts = Scripts.scripts_scalars(distinct_scalars)
+    mixed_script? = Scripts.mixed_scalars?(distinct_scalars)
 
     zeros =
-      scalars |> Enum.map(&Numbers.zero/1) |> Enum.reject(&is_nil/1) |> Enum.uniq() |> Enum.sort()
+      distinct_scalars
+      |> Enum.map(&Numbers.zero/1)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+      |> Enum.sort()
 
-    raw_level = Restrictions.level_scalars(scalars, Identifier.allowed_scalars?(scalars))
+    membership? = Identifier.allowed_scalars?(scalars)
+    raw_level = Restrictions.level_scalars(scalars, membership?)
 
     adjusted_level =
-      Restrictions.level_scalars(scalars, Profile.allowed_scalars?(policy.type, scalars))
+      if Enum.any?(scalars, &Profile.exception?(policy.type, &1)),
+        do: Restrictions.level_scalars(scalars, Profile.allowed_scalars?(policy.type, scalars)),
+        else: raw_level
 
     invalid_joiners = scalars |> JoinControls.invalid_indexes() |> MapSet.new()
 
     positional =
       decoded
       |> Enum.with_index()
-      |> Enum.flat_map(fn {{scalar, offset}, index} ->
-        scalar_reasons(scalar, offset, index, policy, MapSet.member?(invalid_joiners, index))
+      |> Enum.map_reduce(%{}, fn {{scalar, offset}, index}, cache ->
+        # Join validity is per occurrence, so it participates in the cache key.
+        key = {scalar, MapSet.member?(invalid_joiners, index)}
+
+        {templates, cache} =
+          case Map.fetch(cache, key) do
+            {:ok, templates} ->
+              {templates, cache}
+
+            :error ->
+              templates = scalar_reasons(scalar, 0, 0, policy, elem(key, 1))
+              {templates, Map.put(cache, key, templates)}
+          end
+
+        {Enum.map(templates, &%{&1 | byte_offset: offset, codepoint_index: index}), cache}
       end)
+      |> elem(0)
+      |> List.flatten()
 
     reasons =
       positional

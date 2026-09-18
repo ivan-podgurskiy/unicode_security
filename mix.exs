@@ -12,7 +12,7 @@ defmodule UnicodeSecurity.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
       name: "UnicodeSecurity",
-      description: "Pinned Unicode normalization and confusable comparison keys for Elixir.",
+      description: "Pinned Unicode identifier security properties and policy checks for Elixir.",
       package: package(),
       source_url: @source_url,
       docs: docs(),
