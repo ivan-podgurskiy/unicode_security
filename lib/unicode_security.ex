@@ -150,6 +150,41 @@ defmodule UnicodeSecurity do
   def compare(left, right, options \\ []), do: UnicodeSecurity.Pair.compare(left, right, options)
 
   @doc """
+  Returns the pinned skeleton key for a required identifier type.
+
+  Requires exactly `type: :username`, `:tenant_slug`, or `:organization_name`.
+  Policy and script overrides are not accepted. The original UTF-8 input is
+  validated with the 4,096-byte limit; there is no case folding, trimming, or
+  policy check. The key is only a comparison fact, not a storage or identity key.
+  """
+  @spec conflict_key(binary(), term()) :: binary()
+  defdelegate conflict_key(input, options), to: UnicodeSecurity.Conflicts
+
+  @doc """
+  Returns whether any visited existing identifier has the candidate's skeleton.
+
+  Requires exactly the same type option as `conflict_key/2`. Candidate validation
+  precedes collection validation. The enumerable is consumed lazily and stops at
+  the first match; malformed or nonbinary visited values raise, while unvisited
+  values are untouched. This is an advisory check: concurrent storage changes may
+  alter the result, and matching does not establish ownership or authorization.
+  """
+  @spec conflicts?(binary(), Enumerable.t(), term()) :: boolean()
+  defdelegate conflicts?(input, existing, options), to: UnicodeSecurity.Conflicts
+
+  @doc """
+  Returns all skeleton matches in enumerable order with original indexes and evidence.
+
+  Requires exactly the same type option as `conflict_key/2`. Candidate validation
+  precedes collection validation; every existing value is visited, validated as a
+  UTF-8 binary of at most 4,096 bytes, and may raise. Duplicates are retained.
+  Results are advisory and must be paired with application storage checks; they
+  are not policy verdicts or authorization decisions.
+  """
+  @spec conflicts(binary(), Enumerable.t(), term()) :: [UnicodeSecurity.Conflict.t()]
+  defdelegate conflicts(input, existing, options), to: UnicodeSecurity.Conflicts
+
+  @doc """
   Returns the sorted unique Script property values observed in the original input.
 
   Values are lowercase snake-case atoms from the pinned Unicode data, including
