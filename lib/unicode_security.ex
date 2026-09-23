@@ -121,6 +121,25 @@ defmodule UnicodeSecurity do
   defdelegate skeleton(input), to: UnicodeSecurity.Confusables
 
   @doc """
+  Returns whether two validated original inputs have equal pinned skeleton keys.
+
+  Both inputs are validated left to right, even when identical. A matching key
+  does not establish identity, intent, or authorization.
+  """
+  @spec same_skeleton?(binary(), binary()) :: boolean()
+  defdelegate same_skeleton?(left, right), to: UnicodeSecurity.Pair
+
+  @doc """
+  Returns whether two original inputs share a skeleton but differ canonically.
+
+  Canonically equivalent strings, including identical strings, return `false`.
+  Both inputs are validated left to right. This predicate is a comparison fact,
+  not a safety or authorization verdict.
+  """
+  @spec confusable?(binary(), binary()) :: boolean()
+  defdelegate confusable?(left, right), to: UnicodeSecurity.Pair
+
+  @doc """
   Returns the sorted unique Script property values observed in the original input.
 
   Values are lowercase snake-case atoms from the pinned Unicode data, including

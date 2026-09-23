@@ -51,6 +51,8 @@ defmodule UnicodeSecurity.ProjectTest do
           identifier_types: 1,
           allowed_identifier?: 1,
           skeleton: 1,
+          same_skeleton?: 2,
+          confusable?: 2,
           scripts: 1,
           mixed_script?: 1,
           mixed_number?: 1,
