@@ -240,6 +240,22 @@
        valid_input?: true,
        reasons: []
      }},
+    {"tenant slug hyphen", "m-", [type: :tenant_slug, policy: :default],
+     %UnicodeSecurity.Result{
+       input: "m-",
+       type: :tenant_slug,
+       policy: :default,
+       verdict: :safe,
+       scripts: [:common, :latin],
+       mixed_script?: false,
+       mixed_number?: false,
+       restriction_level: :ascii,
+       skeleton: "rn-",
+       unicode_version: "18.0.0",
+       domain: nil,
+       valid_input?: true,
+       reasons: []
+     }},
     {"tenant punctuation syntax", "a_", [type: :tenant_slug, policy: :permissive],
      %UnicodeSecurity.Result{
        input: "a_",
