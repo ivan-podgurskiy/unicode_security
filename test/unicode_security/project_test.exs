@@ -53,6 +53,8 @@ defmodule UnicodeSecurity.ProjectTest do
           skeleton: 1,
           same_skeleton?: 2,
           confusable?: 2,
+          compare: 2,
+          compare: 3,
           scripts: 1,
           mixed_script?: 1,
           mixed_number?: 1,

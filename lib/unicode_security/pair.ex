@@ -1,7 +1,15 @@
 defmodule UnicodeSecurity.Pair do
   @moduledoc false
 
-  alias UnicodeSecurity.{Comparison, Confusables, Normalization, Scripts, Utf8}
+  alias UnicodeSecurity.{
+    Comparison,
+    ComparisonOptions,
+    Confusables,
+    Normalization,
+    Scripts,
+    SkeletonTrace,
+    Utf8
+  }
 
   @type prepared :: %{
           decoded: [{non_neg_integer(), non_neg_integer()}],
@@ -46,6 +54,17 @@ defmodule UnicodeSecurity.Pair do
     left_facts = prepare(left)
     right_facts = prepare(right)
     left_facts.skeleton == right_facts.skeleton and left_facts.nfd != right_facts.nfd
+  end
+
+  @spec compare(binary(), binary(), term()) :: Comparison.t()
+  def compare(left, right, options \\ []) do
+    ComparisonOptions.resolve!(options, :optional)
+    left_facts = prepare(left)
+    right_facts = prepare(right)
+    comparison = compare_prepared(left_facts, right_facts)
+    {_left_skeleton, left_mappings} = SkeletonTrace.trace(left_facts.decoded, :left)
+    {_right_skeleton, right_mappings} = SkeletonTrace.trace(right_facts.decoded, :right)
+    %{comparison | mappings: left_mappings ++ right_mappings}
   end
 
   @spec classify_sets(Comparison.resolved_scripts(), Comparison.resolved_scripts()) ::

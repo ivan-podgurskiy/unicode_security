@@ -45,9 +45,11 @@ defmodule UnicodeSecurity.Confusables do
     |> Normalization.nfd_scalars()
   end
 
-  defp prototype(scalar) when scalar <= 0x7F, do: elem(@ascii_prototypes, scalar)
+  @doc false
+  @spec prototype(0..0x10FFFF) :: [0..0x10FFFF]
+  def prototype(scalar) when scalar <= 0x7F, do: elem(@ascii_prototypes, scalar)
 
-  defp prototype(scalar) do
+  def prototype(scalar) do
     if BidiData.default_ignorable?(scalar), do: [], else: Data.mapping(scalar) || [scalar]
   end
 end

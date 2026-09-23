@@ -28,6 +28,22 @@ defmodule UnicodeSecurity.Bidi do
     end
   end
 
+  @doc false
+  @spec reorder_with_indexes([0..0x10FFFF]) :: [{0..0x10FFFF, non_neg_integer()}]
+  def reorder_with_indexes(scalars) do
+    if Enum.all?(scalars, &(&1 in 0x20..0x7E)) do
+      Enum.with_index(scalars)
+    else
+      {outputs, _offset} =
+        Enum.map_reduce(paragraphs(scalars), 0, fn paragraph, offset ->
+          values = Enum.map(visual_chars(paragraph), &{&1.code, offset + &1.index})
+          {values, offset + length(paragraph)}
+        end)
+
+      List.flatten(outputs)
+    end
+  end
+
   defp paragraphs(scalars) do
     Enum.chunk_while(
       scalars,
@@ -45,13 +61,19 @@ defmodule UnicodeSecurity.Bidi do
   end
 
   defp visual_paragraph(paragraph) do
+    paragraph |> visual_chars() |> Enum.map(& &1.code)
+  end
+
+  defp visual_chars(paragraph) do
     {_logical, visual, _level} = resolve_paragraph(paragraph, 0)
 
     visual
     |> Enum.chunk_by(& &1.level)
     |> Enum.flat_map(&place_marks/1)
     |> Enum.map(fn char ->
-      if rem(char.level, 2) == 1, do: Data.mirror(char.code), else: char.code
+      if rem(char.level, 2) == 1,
+        do: %{char | code: Data.mirror(char.code)},
+        else: char
     end)
   end
 

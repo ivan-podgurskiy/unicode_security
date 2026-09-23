@@ -14,6 +14,91 @@ defmodule UnicodeSecurity.PairTest do
     refute UnicodeSecurity.same_skeleton?("alice", "bob")
   end
 
+  test "comparison exposes complete facts without conflating canonical identity" do
+    pair = UnicodeSecurity.compare("m", "rn", type: :tenant_slug)
+    assert Pair.compare("m", "rn") == UnicodeSecurity.compare("m", "rn")
+    assert pair.confusable? and pair.same_skeleton?
+    refute pair.canonically_equivalent?
+    assert pair.class == :single_script_confusable
+    assert pair.left_resolved_scripts == [:hntl, :latin]
+
+    assert Enum.map(pair.mappings, &{&1.side, &1.codepoint_index, &1.mapping}) ==
+             [{:left, 0, "rn"}, {:right, 0, "r"}, {:right, 1, "n"}]
+
+    canonical = UnicodeSecurity.compare("é", "e\u0301")
+    assert canonical.canonically_equivalent? and canonical.same_skeleton?
+    refute canonical.confusable?
+    assert canonical.class == :none
+    assert length(canonical.mappings) == 3
+  end
+
+  test "public comparison covers all classes, neutral sets, and unequal evidence" do
+    for {left, right, class} <- [
+          {"m", "rn", :single_script_confusable},
+          {"scope", "ѕсоре", :whole_script_confusable},
+          {"paypal", "pаypаl", :mixed_script_confusable},
+          {"é", "e\u0301", :none},
+          {"alice", "bob", :none}
+        ],
+        type <- [:username, :tenant_slug, :organization_name] do
+      comparison = UnicodeSecurity.compare(left, right, type: type)
+      assert comparison.class == class
+      assert comparison.left_skeleton == UnicodeSecurity.skeleton(left)
+      assert comparison.right_skeleton == UnicodeSecurity.skeleton(right)
+
+      assert Enum.count(comparison.mappings, &(&1.side == :left)) ==
+               length(String.to_charlist(left))
+
+      assert Enum.count(comparison.mappings, &(&1.side == :right)) ==
+               length(String.to_charlist(right))
+    end
+
+    assert UnicodeSecurity.compare("", "m").left_resolved_scripts == :all
+    assert UnicodeSecurity.compare("!", "m").left_resolved_scripts == :all
+
+    assert UnicodeSecurity.compare("漢", "字").left_resolved_scripts ==
+             [:han, :hanb, :hntl, :jpan, :kore]
+  end
+
+  test "comparison validates options before malformed content and inputs left to right" do
+    for options <- [nil, [type: :domain], [policy: :default], [type: :username, type: :username]] do
+      assert_raise ArgumentError, fn -> UnicodeSecurity.compare(<<255>>, <<255>>, options) end
+    end
+
+    for type <- [:username, :tenant_slug, :organization_name] do
+      assert %UnicodeSecurity.Comparison{} = UnicodeSecurity.compare("m", "rn", type: type)
+    end
+
+    for {left, right, offset, reason} <- [
+          {"a" <> <<255>>, <<255>>, 1, :invalid_utf8},
+          {"ok", "a" <> <<255>>, 1, :invalid_utf8},
+          {String.duplicate("a", 4097), <<255>>, 4096, :input_too_long}
+        ] do
+      error = assert_raise InvalidInputError, fn -> UnicodeSecurity.compare(left, right) end
+      assert {error.byte_offset, error.reason} == {offset, reason}
+    end
+  end
+
+  test "swapped comparison exchanges facts and evidence sides" do
+    forward = UnicodeSecurity.compare("m", "rn")
+    reverse = UnicodeSecurity.compare("rn", "m")
+
+    assert forward.same_skeleton? == reverse.same_skeleton?
+    assert forward.confusable? == reverse.confusable?
+    assert forward.class == reverse.class
+    assert forward.left_skeleton == reverse.right_skeleton
+    assert forward.right_skeleton == reverse.left_skeleton
+
+    for side <- [:left, :right] do
+      opposite = if side == :left, do: :right, else: :left
+
+      assert Enum.filter(forward.mappings, &(&1.side == side))
+             |> Enum.map(&Map.delete(&1, :side)) ==
+               Enum.filter(reverse.mappings, &(&1.side == opposite))
+               |> Enum.map(&Map.delete(&1, :side))
+    end
+  end
+
   test "identical invalid inputs never bypass validation" do
     for input <- [<<255>>, String.duplicate("a", 4097)] do
       for operation <- [&UnicodeSecurity.same_skeleton?/2, &UnicodeSecurity.confusable?/2] do

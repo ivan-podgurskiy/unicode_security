@@ -140,6 +140,16 @@ defmodule UnicodeSecurity do
   defdelegate confusable?(left, right), to: UnicodeSecurity.Pair
 
   @doc """
+  Returns comparison facts and original-input mapping evidence for two identifiers.
+
+  Accepts optional `type: :username`, `:tenant_slug`, or `:organization_name`.
+  Both inputs are validated left to right. Matching keys are comparison facts,
+  not identity or authorization decisions.
+  """
+  @spec compare(binary(), binary(), term()) :: UnicodeSecurity.Comparison.t()
+  def compare(left, right, options \\ []), do: UnicodeSecurity.Pair.compare(left, right, options)
+
+  @doc """
   Returns the sorted unique Script property values observed in the original input.
 
   Values are lowercase snake-case atoms from the pinned Unicode data, including

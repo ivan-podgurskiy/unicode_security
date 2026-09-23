@@ -39,6 +39,17 @@ defmodule UnicodeSecurity.Normalization do
   end
 
   @doc false
+  @spec nfd_tagged([{0..0x10FFFF, non_neg_integer()}]) ::
+          [{0..0x10FFFF, non_neg_integer()}]
+  def nfd_tagged(values) do
+    values
+    |> Enum.flat_map(fn {scalar, origin} ->
+      Enum.map(decompose(scalar), &{&1, origin})
+    end)
+    |> reorder([], [])
+  end
+
+  @doc false
   @spec nfc_scalars([0..0x10FFFF]) :: [0..0x10FFFF]
   def nfc_scalars(scalars), do: scalars |> nfd_scalars() |> recompose(nil, [], 0, [])
 
@@ -99,12 +110,15 @@ defmodule UnicodeSecurity.Normalization do
 
   defp reorder([], marks, acc), do: Enum.reverse(flush_marks(marks, acc))
 
-  defp reorder([scalar | rest], marks, acc) do
-    case Data.combining_class(scalar) do
-      0 -> reorder(rest, [], [scalar | flush_marks(marks, acc)])
-      class -> reorder(rest, [{scalar, class} | marks], acc)
+  defp reorder([value | rest], marks, acc) do
+    case Data.combining_class(scalar_value(value)) do
+      0 -> reorder(rest, [], [value | flush_marks(marks, acc)])
+      class -> reorder(rest, [{value, class} | marks], acc)
     end
   end
+
+  defp scalar_value({scalar, _origin}), do: scalar
+  defp scalar_value(scalar), do: scalar
 
   defp flush_marks(marks, acc) do
     # Restore source order before the stable sort so equal classes keep their order.
