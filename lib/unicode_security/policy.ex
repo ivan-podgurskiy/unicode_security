@@ -22,6 +22,11 @@ defmodule UnicodeSecurity.Policy do
   @severities %{info: 0, low: 1, medium: 2, high: 3, critical: 4}
   @preset_indices %{strict: 0, default: 1, permissive: 2}
   @matrix %{
+    exact_duplicate: {:info, :info, :info},
+    skeleton_collision: {:critical, :high, :medium},
+    single_script_confusable: {:critical, :high, :medium},
+    mixed_script_confusable: {:critical, :high, :medium},
+    whole_script_confusable: {:critical, :high, :medium},
     invalid_item_type: {:critical, :critical, :critical},
     invalid_utf8: {:critical, :critical, :critical},
     input_too_long: {:critical, :critical, :critical},

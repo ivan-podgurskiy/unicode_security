@@ -82,6 +82,19 @@ defmodule UnicodeSecurity do
   @spec audit(Enumerable.t(), keyword()) :: Enumerable.t()
   defdelegate audit(enumerable, options), to: UnicodeSecurity.Batch
 
+  @doc """
+  Eagerly audits an enumerable and returns ordered exact-duplicate and
+  shared-skeleton groups alongside unchanged item results.
+
+  Requires the same policy options as `audit/2`. Every binary, including invalid
+  input, may form an exact-duplicate group. Only valid inputs with computable
+  skeletons enter collision groups. A collision requires distinct exact binary
+  inputs; canonical variants can share a key without a confusable class.
+  Group findings describe relationships, not an identity or ownership decision.
+  """
+  @spec check_many(Enumerable.t(), keyword()) :: UnicodeSecurity.BatchResult.t()
+  defdelegate check_many(enumerable, options), to: UnicodeSecurity.Batch
+
   @doc "Returns the Unicode version used by the compiled data; see `data_manifest/0` for draft status."
   @spec unicode_version() :: binary()
   def unicode_version, do: "18.0.0"

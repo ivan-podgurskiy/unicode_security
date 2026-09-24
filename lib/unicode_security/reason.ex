@@ -34,6 +34,8 @@ defmodule UnicodeSecurity.Reason do
   - `:mixed_numbers`: `%{zero_codepoints: sorted_unique_decimal_zero_scalars}`.
   - `:restriction_level_below_policy`: `%{actual: raw_level, minimum: policy_minimum}`;
     the decision uses membership extended only by explicit punctuation exceptions.
+  - `:exact_duplicate`, `:skeleton_collision`, and the three confusable classes:
+    `%{indexes: ordered_zero_based_indexes}` in eager batch collections only.
 
   ## Severities
 
@@ -44,6 +46,8 @@ defmodule UnicodeSecurity.Reason do
   | profile_syntax, restricted_character, invalid_join_control_context, disallowed_script, denied_script | high | high | medium |
   | default_ignorable, bidi_control | critical | high | high |
   | mixed_scripts, mixed_numbers, restriction_level_below_policy | high | medium | low |
+  | single_script_confusable, mixed_script_confusable, whole_script_confusable, skeleton_collision | critical | high | medium |
+  | exact_duplicate | info | info | info |
 
   No reasons or only `:info` means safe, `:low`/`:medium` suspicious, and
   `:high`/`:critical` dangerous. Current checks do not emit collision or generic
@@ -68,6 +72,11 @@ defmodule UnicodeSecurity.Reason do
           | :mixed_scripts
           | :mixed_numbers
           | :restriction_level_below_policy
+          | :single_script_confusable
+          | :mixed_script_confusable
+          | :whole_script_confusable
+          | :skeleton_collision
+          | :exact_duplicate
   @type severity :: :info | :low | :medium | :high | :critical
   @type syntax_rule :: :whitespace | :punctuation | :unsupported_category
   @type actual_type ::
@@ -93,6 +102,7 @@ defmodule UnicodeSecurity.Reason do
           | %{script: atom()}
           | %{scripts: [atom()]}
           | %{zero_codepoints: [non_neg_integer()]}
+          | %{indexes: [non_neg_integer()]}
           | %{
               actual: UnicodeSecurity.Result.restriction_level(),
               minimum: UnicodeSecurity.Result.restriction_level()

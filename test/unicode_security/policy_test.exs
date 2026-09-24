@@ -1,12 +1,37 @@
 defmodule UnicodeSecurity.PolicyTest do
   use ExUnit.Case, async: true
 
+  alias UnicodeSecurity.{BatchResult, Collision, Duplicate}
   alias UnicodeSecurity.Data.Scripts
   alias UnicodeSecurity.Policy
   alias UnicodeSecurity.Reason
   alias UnicodeSecurity.Result
 
   test "public structs retain exact fields and partial-result defaults" do
+    assert Map.from_struct(struct(BatchResult)) == %{
+             results: [],
+             collisions: [],
+             duplicates: [],
+             unicode_version: nil
+           }
+
+    assert Map.from_struct(struct(Duplicate)) == %{
+             input: nil,
+             indexes: [],
+             reasons: [],
+             unicode_version: nil
+           }
+
+    assert Map.from_struct(struct(Collision)) == %{
+             key: nil,
+             indexes: [],
+             inputs: [],
+             class: nil,
+             classes: [],
+             reasons: [],
+             unicode_version: nil
+           }
+
     assert Map.from_struct(struct(Result)) == %{
              input: nil,
              type: nil,
@@ -138,7 +163,12 @@ defmodule UnicodeSecurity.PolicyTest do
           {:bidi_control, :critical, :high, :high},
           {:mixed_scripts, :high, :medium, :low},
           {:mixed_numbers, :high, :medium, :low},
-          {:restriction_level_below_policy, :high, :medium, :low}
+          {:restriction_level_below_policy, :high, :medium, :low},
+          {:single_script_confusable, :critical, :high, :medium},
+          {:mixed_script_confusable, :critical, :high, :medium},
+          {:whole_script_confusable, :critical, :high, :medium},
+          {:skeleton_collision, :critical, :high, :medium},
+          {:exact_duplicate, :info, :info, :info}
         ] do
       assert Policy.severity(:strict, code) == strict
       assert Policy.severity(:default, code) == default

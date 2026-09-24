@@ -1,7 +1,20 @@
 defmodule UnicodeSecurity.Batch do
   @moduledoc false
 
+  alias UnicodeSecurity.Batch.Groups
   alias UnicodeSecurity.{BatchItem, Check, Policy, Reason, Result}
+
+  @doc "Eagerly audits one enumerable and groups exact duplicates and shared skeletons."
+  @spec check_many(Enumerable.t(), term()) :: UnicodeSecurity.BatchResult.t()
+  def check_many(enumerable, options) do
+    policy = Policy.resolve!(options)
+    validate_enumerable!(enumerable)
+
+    enumerable
+    |> stream_items(policy)
+    |> Enum.reduce(Groups.new(), fn item, groups -> Groups.add(groups, item) end)
+    |> Groups.finish(policy)
+  end
 
   @spec audit(Enumerable.t(), term()) :: Enumerable.t()
   def audit(enumerable, options) do
