@@ -48,6 +48,10 @@ defmodule UnicodeSecurity.MetadataTest do
       UnicodeSecurity.check(<<255>>, type: :tenant_slug)
     %{__struct__: UnicodeSecurity.Result,policy: :permissive, verdict: :suspicious} =
       UnicodeSecurity.check("Acme & Co.", type: :organization_name)
+    [%{__struct__: UnicodeSecurity.BatchItem,index: 0, input: nil,
+      result: %{__struct__: UnicodeSecurity.Result,verdict: :dangerous,
+        reasons: [%{code: :invalid_item_type, details: %{actual_type: :atom}}]}}] =
+      UnicodeSecurity.audit([nil], type: :username) |> Enum.to_list()
     false = Code.ensure_loaded?(UnicodeSecurity.UnicodeData.Source)
     """
 
@@ -62,6 +66,8 @@ defmodule UnicodeSecurity.MetadataTest do
             UnicodeSecurity.Normalization,
             UnicodeSecurity.Result,
             UnicodeSecurity.Reason,
+            UnicodeSecurity.BatchItem,
+            UnicodeSecurity.Batch,
             UnicodeSecurity.Check,
             UnicodeSecurity.Policy,
             UnicodeSecurity.Profile,

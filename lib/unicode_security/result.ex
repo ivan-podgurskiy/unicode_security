@@ -7,13 +7,13 @@ defmodule UnicodeSecurity.Result do
   fully analyzed input. `domain` is reserved for domain analysis and is `nil`
   for username, tenant-slug and organization-name analysis.
 
-  `input` is unchanged. `scripts` lists observed ordinary Script values;
+  `input` is unchanged, including nonbinary items in an audit. `scripts` lists observed ordinary Script values;
   `mixed_script?` uses augmented Script_Extensions. `mixed_number?` counts decimal
   zero representatives. `restriction_level` is the raw standards level even when
   profile punctuation changes the policy decision. `skeleton` is a comparison key,
   never a replacement value. `unicode_version` versions these pinned-data facts.
 
-  Malformed UTF-8 and input over 4,096 original bytes have `valid_input?: false`
+  Nonbinary audit items, malformed UTF-8 and input over 4,096 original bytes have `valid_input?: false`
   and nil scripts, mixed flags, restriction level and skeleton. Empty input has
   `valid_input?: true`, `scripts: []`, false mixed flags, `restriction_level: :ascii`,
   and `skeleton: ""`, plus a high empty-input reason. Policy danger does not make
@@ -53,7 +53,7 @@ defmodule UnicodeSecurity.Result do
           | :unrestricted
 
   @type t :: %__MODULE__{
-          input: binary() | nil,
+          input: term(),
           type: input_type() | nil,
           policy: preset() | nil,
           verdict: verdict() | nil,

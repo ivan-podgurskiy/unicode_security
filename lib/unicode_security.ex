@@ -68,6 +68,20 @@ defmodule UnicodeSecurity do
   @spec check(binary(), keyword()) :: UnicodeSecurity.Result.t()
   defdelegate check(input, options), to: UnicodeSecurity.Check
 
+  @doc """
+  Lazily audits an enumerable of candidate identifiers under one policy.
+
+  Returns a repeatable stream of `UnicodeSecurity.BatchItem` values with
+  zero-based indexes and unchanged inputs. Valid options and an enumerable are
+  required when this function is called; source items are read only as the
+  stream is consumed. Each binary uses the same analysis as `check/2`.
+  Nonbinary items become dangerous results with an `:invalid_item_type` reason.
+  Producer exceptions propagate during consumption. The stream retains only
+  its source and policy between items.
+  """
+  @spec audit(Enumerable.t(), keyword()) :: Enumerable.t()
+  defdelegate audit(enumerable, options), to: UnicodeSecurity.Batch
+
   @doc "Returns the Unicode version used by the compiled data; see `data_manifest/0` for draft status."
   @spec unicode_version() :: binary()
   def unicode_version, do: "18.0.0"

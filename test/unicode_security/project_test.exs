@@ -47,6 +47,7 @@ defmodule UnicodeSecurity.ProjectTest do
 
     for {name, arity} <- [
           check: 2,
+          audit: 2,
           identifier_status: 1,
           identifier_types: 1,
           allowed_identifier?: 1,

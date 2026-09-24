@@ -125,6 +125,7 @@ defmodule UnicodeSecurity.PolicyTest do
 
   test "uses the literal generic reason severity matrix for all presets" do
     for {code, strict, default, permissive} <- [
+          {:invalid_item_type, :critical, :critical, :critical},
           {:invalid_utf8, :critical, :critical, :critical},
           {:input_too_long, :critical, :critical, :critical},
           {:empty_input, :high, :high, :high},

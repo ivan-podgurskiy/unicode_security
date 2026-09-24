@@ -36,6 +36,12 @@ defmodule UnicodeSecurity.Check do
   @spec check(binary(), keyword()) :: Result.t()
   def check(input, options) do
     policy = Policy.resolve!(options)
+    check_resolved(input, policy)
+  end
+
+  @doc false
+  @spec check_resolved(binary(), Policy.t()) :: Result.t()
+  def check_resolved(input, policy) do
     if not is_binary(input), do: raise(ArgumentError, "expected a binary input")
 
     result = %Result{

@@ -15,6 +15,10 @@ defmodule UnicodeSecurity.Reason do
   ## Codes and details
 
   - `:invalid_utf8`: `%{invalid_byte: byte}`.
+  - `:invalid_item_type`: `%{actual_type: type}` where `type` is one of
+    `:atom`, `:integer`, `:float`, `:list`, `:tuple`, `:map`, `:bitstring`,
+    `:function`, `:pid`, `:port`, or `:reference`. Nil and booleans are atoms;
+    structs are maps. Audit items with this code have nil positions.
   - `:input_too_long`: `%{actual_bytes: count, maximum_bytes: 4096}`.
   - `:empty_input`: `%{}`; valid UTF-8 with positions zero.
   - `:profile_syntax`: `%{codepoint: scalar, rule: :whitespace | :punctuation |
@@ -35,7 +39,7 @@ defmodule UnicodeSecurity.Reason do
 
   | Codes | Strict | Default | Permissive |
   | --- | --- | --- | --- |
-  | invalid_utf8, input_too_long | critical | critical | critical |
+  | invalid_item_type, invalid_utf8, input_too_long | critical | critical | critical |
   | empty_input | high | high | high |
   | profile_syntax, restricted_character, invalid_join_control_context, disallowed_script, denied_script | high | high | medium |
   | default_ignorable, bidi_control | critical | high | high |
@@ -50,7 +54,8 @@ defmodule UnicodeSecurity.Reason do
   defstruct [:code, :severity, :message, :byte_offset, :codepoint_index, details: %{}]
 
   @type code ::
-          :invalid_utf8
+          :invalid_item_type
+          | :invalid_utf8
           | :input_too_long
           | :empty_input
           | :profile_syntax
@@ -65,8 +70,21 @@ defmodule UnicodeSecurity.Reason do
           | :restriction_level_below_policy
   @type severity :: :info | :low | :medium | :high | :critical
   @type syntax_rule :: :whitespace | :punctuation | :unsupported_category
+  @type actual_type ::
+          :atom
+          | :integer
+          | :float
+          | :list
+          | :tuple
+          | :map
+          | :bitstring
+          | :function
+          | :pid
+          | :port
+          | :reference
   @type details ::
           %{}
+          | %{actual_type: actual_type()}
           | %{invalid_byte: byte()}
           | %{actual_bytes: non_neg_integer(), maximum_bytes: 4096}
           | %{codepoint: non_neg_integer(), rule: syntax_rule()}
