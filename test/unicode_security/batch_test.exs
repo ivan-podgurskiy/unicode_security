@@ -217,16 +217,18 @@ defmodule UnicodeSecurity.BatchTest do
     refute_received :closed
   end
 
-  property "small real buckets agree with an independent all-pairs classifier" do
+  property "small real buckets agree with independent groups and all-pairs classes" do
     values = ["m", "rn", "scope", "ѕсоре", "scоpe", "𝐬𝐜𝐨𝐩𝐞", "é", "é", "", "\u200D"]
 
     check all(indices <- list_of(integer(0..9), max_length: 8), max_runs: 40) do
-      inputs = Enum.map(indices, &Enum.at(values, &1))
+      inputs = ["m", "rn" | Enum.map(indices, &Enum.at(values, &1))]
       batch = UnicodeSecurity.check_many(inputs, type: :organization_name)
 
-      for collision <- batch.collisions do
-        assert collision.classes == oracle_classes(collision.inputs)
-      end
+      assert Enum.map(
+               batch.collisions,
+               &Map.take(&1, [:key, :indexes, :inputs, :class, :classes])
+             ) ==
+               oracle_groups(inputs)
     end
   end
 
@@ -266,6 +268,30 @@ defmodule UnicodeSecurity.BatchTest do
         [:mixed_script_confusable, :whole_script_confusable, :single_script_confusable],
         &MapSet.member?(classes, &1)
       )
+    end)
+  end
+
+  defp oracle_groups(inputs) do
+    inputs
+    |> Enum.with_index()
+    |> Enum.group_by(fn {input, _index} ->
+      UnicodeSecurity.conflict_key(input, type: :organization_name)
+    end)
+    |> Enum.sort_by(fn {_key, members} -> members |> hd() |> elem(1) end)
+    |> Enum.filter(fn {_key, members} ->
+      members |> Enum.map(&elem(&1, 0)) |> Enum.uniq() |> length() >= 2
+    end)
+    |> Enum.map(fn {key, members} ->
+      {bucket_inputs, indexes} = Enum.unzip(members)
+      classes = oracle_classes(bucket_inputs)
+
+      %{
+        key: key,
+        indexes: indexes,
+        inputs: bucket_inputs,
+        class: List.first(classes) || :none,
+        classes: classes
+      }
     end)
   end
 
