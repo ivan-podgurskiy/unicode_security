@@ -77,7 +77,8 @@ defmodule UnicodeSecurity do
   stream is consumed. Each binary uses the same analysis as `check/2`.
   Nonbinary items become dangerous results with an `:invalid_item_type` reason.
   Producer exceptions propagate during consumption. The stream retains only
-  its source and policy between items.
+  its source and policy between items. Consume a finite prefix with `Enum.take/2`
+  when the source is unbounded.
   """
   @spec audit(Enumerable.t(), keyword()) :: Enumerable.t()
   defdelegate audit(enumerable, options), to: UnicodeSecurity.Batch
@@ -90,7 +91,11 @@ defmodule UnicodeSecurity do
   input, may form an exact-duplicate group. Only valid inputs with computable
   skeletons enter collision groups. A collision requires distinct exact binary
   inputs; canonical variants can share a key without a confusable class.
-  Group findings describe relationships, not an identity or ownership decision.
+  A collision's `classes` follow mixed, whole, then single-script precedence;
+  its `class` is the first or `:none` for canonical-only key collisions.
+  Collection reasons carry indexes and preset severity without changing any
+  per-item result. Group findings describe relationships, not an identity or
+  ownership decision.
   """
   @spec check_many(Enumerable.t(), keyword()) :: UnicodeSecurity.BatchResult.t()
   defdelegate check_many(enumerable, options), to: UnicodeSecurity.Batch
@@ -171,7 +176,10 @@ defmodule UnicodeSecurity do
 
   Accepts optional `type: :username`, `:tenant_slug`, or `:organization_name`.
   Both inputs are validated left to right. Matching keys are comparison facts,
-  not identity or authorization decisions.
+  not identity or authorization decisions. `mappings` has one entry per original
+  scalar, including removed controls; byte offsets and scalar indexes refer to
+  original input, while `skeleton_spans` use output scalar coordinates.
+  `:all` denotes wholly neutral resolved scripts, and `[]` a mixed intersection.
   """
   @spec compare(binary(), binary(), term()) :: UnicodeSecurity.Comparison.t()
   def compare(left, right, options \\ []), do: UnicodeSecurity.Pair.compare(left, right, options)
@@ -182,7 +190,9 @@ defmodule UnicodeSecurity do
   Requires exactly `type: :username`, `:tenant_slug`, or `:organization_name`.
   Policy and script overrides are not accepted. The original UTF-8 input is
   validated with the 4,096-byte limit; there is no case folding, trimming, or
-  policy check. The key is only a comparison fact, not a storage or identity key.
+  policy check. Persist the original input and Unicode version alongside any
+  application-owned key index, and recompute versioned keys on data upgrades.
+  The key alone does not decide identity or authorization.
   """
   @spec conflict_key(binary(), term()) :: binary()
   defdelegate conflict_key(input, options), to: UnicodeSecurity.Conflicts

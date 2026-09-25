@@ -1,0 +1,139 @@
+# Complete public comparison terms, authored from the approved contracts and pinned mappings.
+%{version: 1, cases: [
+  {"ASCII MA expansion", :compare, ["m", "rn"],
+   %UnicodeSecurity.Comparison{
+     confusable?: true, same_skeleton?: true, class: :single_script_confusable,
+     canonically_equivalent?: false, left_skeleton: "rn", right_skeleton: "rn",
+     left_scripts: [:latin], right_scripts: [:latin],
+     left_resolved_scripts: [:hntl, :latin], right_resolved_scripts: [:hntl, :latin],
+     unicode_version: "18.0.0", mappings: [
+       %{side: :left, byte_offset: 0, byte_length: 1, codepoint_index: 0,
+         codepoint_count: 1, codepoints: [?m], skeleton_spans: [%{codepoint_index: 0, codepoint_count: 2}], mapping: "rn"},
+       %{side: :right, byte_offset: 0, byte_length: 1, codepoint_index: 0,
+         codepoint_count: 1, codepoints: [?r], skeleton_spans: [%{codepoint_index: 0, codepoint_count: 1}], mapping: "r"},
+       %{side: :right, byte_offset: 1, byte_length: 1, codepoint_index: 1,
+         codepoint_count: 1, codepoints: [?n], skeleton_spans: [%{codepoint_index: 1, codepoint_count: 1}], mapping: "n"}
+     ]}},
+  {"canonical accent", :compare, ["é", "e\u0301"],
+   %UnicodeSecurity.Comparison{
+     confusable?: false, same_skeleton?: true, class: :none,
+     canonically_equivalent?: true, left_skeleton: "e\u0301", right_skeleton: "e\u0301",
+     left_scripts: [:latin], right_scripts: [:inherited, :latin],
+     left_resolved_scripts: [:hntl, :latin], right_resolved_scripts: [:hntl, :latin],
+     unicode_version: "18.0.0", mappings: [
+       %{side: :left, byte_offset: 0, byte_length: 2, codepoint_index: 0,
+         codepoint_count: 1, codepoints: [0xE9], skeleton_spans: [%{codepoint_index: 0, codepoint_count: 2}], mapping: "e\u0301"},
+       %{side: :right, byte_offset: 0, byte_length: 1, codepoint_index: 0,
+         codepoint_count: 1, codepoints: [?e], skeleton_spans: [%{codepoint_index: 0, codepoint_count: 1}], mapping: "e"},
+       %{side: :right, byte_offset: 1, byte_length: 2, codepoint_index: 1,
+         codepoint_count: 1, codepoints: [0x301], skeleton_spans: [%{codepoint_index: 1, codepoint_count: 1}], mapping: "\u0301"}
+     ]}},
+  {"whole-script scope", :compare, ["scope", "ѕсоре"],
+   %UnicodeSecurity.Comparison{
+     confusable?: true, same_skeleton?: true, class: :whole_script_confusable,
+     canonically_equivalent?: false, left_skeleton: "scope", right_skeleton: "scope",
+     left_scripts: [:latin], right_scripts: [:cyrillic],
+     left_resolved_scripts: [:hntl, :latin], right_resolved_scripts: [:cyrillic],
+     unicode_version: "18.0.0", mappings: [
+       %{side: :left, byte_offset: 0, byte_length: 1, codepoint_index: 0, codepoint_count: 1, codepoints: [?s], skeleton_spans: [%{codepoint_index: 0, codepoint_count: 1}], mapping: "s"},
+       %{side: :left, byte_offset: 1, byte_length: 1, codepoint_index: 1, codepoint_count: 1, codepoints: [?c], skeleton_spans: [%{codepoint_index: 1, codepoint_count: 1}], mapping: "c"},
+       %{side: :left, byte_offset: 2, byte_length: 1, codepoint_index: 2, codepoint_count: 1, codepoints: [?o], skeleton_spans: [%{codepoint_index: 2, codepoint_count: 1}], mapping: "o"},
+       %{side: :left, byte_offset: 3, byte_length: 1, codepoint_index: 3, codepoint_count: 1, codepoints: [?p], skeleton_spans: [%{codepoint_index: 3, codepoint_count: 1}], mapping: "p"},
+       %{side: :left, byte_offset: 4, byte_length: 1, codepoint_index: 4, codepoint_count: 1, codepoints: [?e], skeleton_spans: [%{codepoint_index: 4, codepoint_count: 1}], mapping: "e"},
+       %{side: :right, byte_offset: 0, byte_length: 2, codepoint_index: 0, codepoint_count: 1, codepoints: [0x455], skeleton_spans: [%{codepoint_index: 0, codepoint_count: 1}], mapping: "s"},
+       %{side: :right, byte_offset: 2, byte_length: 2, codepoint_index: 1, codepoint_count: 1, codepoints: [0x441], skeleton_spans: [%{codepoint_index: 1, codepoint_count: 1}], mapping: "c"},
+       %{side: :right, byte_offset: 4, byte_length: 2, codepoint_index: 2, codepoint_count: 1, codepoints: [0x43E], skeleton_spans: [%{codepoint_index: 2, codepoint_count: 1}], mapping: "o"},
+       %{side: :right, byte_offset: 6, byte_length: 2, codepoint_index: 3, codepoint_count: 1, codepoints: [0x440], skeleton_spans: [%{codepoint_index: 3, codepoint_count: 1}], mapping: "p"},
+       %{side: :right, byte_offset: 8, byte_length: 2, codepoint_index: 4, codepoint_count: 1, codepoints: [0x435], skeleton_spans: [%{codepoint_index: 4, codepoint_count: 1}], mapping: "e"}
+     ]}},
+  {"mixed-script paypal", :compare, ["paypal", "pаypаl"],
+   %UnicodeSecurity.Comparison{
+     confusable?: true, same_skeleton?: true, class: :mixed_script_confusable,
+     canonically_equivalent?: false, left_skeleton: "paypal", right_skeleton: "paypal",
+     left_scripts: [:latin], right_scripts: [:cyrillic, :latin],
+     left_resolved_scripts: [:hntl, :latin], right_resolved_scripts: [],
+     unicode_version: "18.0.0", mappings: [
+       %{side: :left, byte_offset: 0, byte_length: 1, codepoint_index: 0, codepoint_count: 1, codepoints: [?p], skeleton_spans: [%{codepoint_index: 0, codepoint_count: 1}], mapping: "p"},
+       %{side: :left, byte_offset: 1, byte_length: 1, codepoint_index: 1, codepoint_count: 1, codepoints: [?a], skeleton_spans: [%{codepoint_index: 1, codepoint_count: 1}], mapping: "a"},
+       %{side: :left, byte_offset: 2, byte_length: 1, codepoint_index: 2, codepoint_count: 1, codepoints: [?y], skeleton_spans: [%{codepoint_index: 2, codepoint_count: 1}], mapping: "y"},
+       %{side: :left, byte_offset: 3, byte_length: 1, codepoint_index: 3, codepoint_count: 1, codepoints: [?p], skeleton_spans: [%{codepoint_index: 3, codepoint_count: 1}], mapping: "p"},
+       %{side: :left, byte_offset: 4, byte_length: 1, codepoint_index: 4, codepoint_count: 1, codepoints: [?a], skeleton_spans: [%{codepoint_index: 4, codepoint_count: 1}], mapping: "a"},
+       %{side: :left, byte_offset: 5, byte_length: 1, codepoint_index: 5, codepoint_count: 1, codepoints: [?l], skeleton_spans: [%{codepoint_index: 5, codepoint_count: 1}], mapping: "l"},
+       %{side: :right, byte_offset: 0, byte_length: 1, codepoint_index: 0, codepoint_count: 1, codepoints: [?p], skeleton_spans: [%{codepoint_index: 0, codepoint_count: 1}], mapping: "p"},
+       %{side: :right, byte_offset: 1, byte_length: 2, codepoint_index: 1, codepoint_count: 1, codepoints: [0x430], skeleton_spans: [%{codepoint_index: 1, codepoint_count: 1}], mapping: "a"},
+       %{side: :right, byte_offset: 3, byte_length: 1, codepoint_index: 2, codepoint_count: 1, codepoints: [?y], skeleton_spans: [%{codepoint_index: 2, codepoint_count: 1}], mapping: "y"},
+       %{side: :right, byte_offset: 4, byte_length: 1, codepoint_index: 3, codepoint_count: 1, codepoints: [?p], skeleton_spans: [%{codepoint_index: 3, codepoint_count: 1}], mapping: "p"},
+       %{side: :right, byte_offset: 5, byte_length: 2, codepoint_index: 4, codepoint_count: 1, codepoints: [0x430], skeleton_spans: [%{codepoint_index: 4, codepoint_count: 1}], mapping: "a"},
+       %{side: :right, byte_offset: 7, byte_length: 1, codepoint_index: 5, codepoint_count: 1, codepoints: [?l], skeleton_spans: [%{codepoint_index: 5, codepoint_count: 1}], mapping: "l"}
+     ]}},
+  {"empty neutral pair", :compare, ["", ""],
+   %UnicodeSecurity.Comparison{
+     confusable?: false, same_skeleton?: true, class: :none,
+     canonically_equivalent?: true, left_skeleton: "", right_skeleton: "",
+     left_scripts: [], right_scripts: [], left_resolved_scripts: :all,
+     right_resolved_scripts: :all, unicode_version: "18.0.0", mappings: []}},
+  {"unequal ASCII", :compare, ["x", "y"],
+   %UnicodeSecurity.Comparison{
+     confusable?: false, same_skeleton?: false, class: :none,
+     canonically_equivalent?: false, left_skeleton: "x", right_skeleton: "y",
+     left_scripts: [:latin], right_scripts: [:latin],
+     left_resolved_scripts: [:hntl, :latin], right_resolved_scripts: [:hntl, :latin],
+     unicode_version: "18.0.0", mappings: [
+       %{side: :left, byte_offset: 0, byte_length: 1, codepoint_index: 0, codepoint_count: 1, codepoints: [?x], skeleton_spans: [%{codepoint_index: 0, codepoint_count: 1}], mapping: "x"},
+       %{side: :right, byte_offset: 0, byte_length: 1, codepoint_index: 0, codepoint_count: 1, codepoints: [?y], skeleton_spans: [%{codepoint_index: 0, codepoint_count: 1}], mapping: "y"}
+     ]}},
+  {"removed neutral scalar", :compare, ["\u200D", ""],
+   %UnicodeSecurity.Comparison{
+     confusable?: true, same_skeleton?: true, class: :single_script_confusable,
+     canonically_equivalent?: false, left_skeleton: "", right_skeleton: "",
+     left_scripts: [:inherited], right_scripts: [],
+     left_resolved_scripts: :all, right_resolved_scripts: :all,
+     unicode_version: "18.0.0", mappings: [
+       %{side: :left, byte_offset: 0, byte_length: 3, codepoint_index: 0, codepoint_count: 1, codepoints: [0x200D], skeleton_spans: [], mapping: ""}
+     ]}},
+  {"supplementary MA scalar", :compare, ["𝐀", "A"],
+   %UnicodeSecurity.Comparison{
+     confusable?: true, same_skeleton?: true, class: :single_script_confusable,
+     canonically_equivalent?: false, left_skeleton: "A", right_skeleton: "A",
+     left_scripts: [:common], right_scripts: [:latin],
+     left_resolved_scripts: :all, right_resolved_scripts: [:hntl, :latin],
+     unicode_version: "18.0.0", mappings: [
+       %{side: :left, byte_offset: 0, byte_length: 4, codepoint_index: 0, codepoint_count: 1, codepoints: [0x1D400], skeleton_spans: [%{codepoint_index: 0, codepoint_count: 1}], mapping: "A"},
+       %{side: :right, byte_offset: 0, byte_length: 1, codepoint_index: 0, codepoint_count: 1, codepoints: [?A], skeleton_spans: [%{codepoint_index: 0, codepoint_count: 1}], mapping: "A"}
+     ]}},
+  {"noncontiguous source contribution", :compare, ["á\u0327", "á\u0327"],
+   %UnicodeSecurity.Comparison{
+     confusable?: false, same_skeleton?: true, class: :none,
+     canonically_equivalent?: true, left_skeleton: "a\u0326\u0301", right_skeleton: "a\u0326\u0301",
+     left_scripts: [:inherited, :latin], right_scripts: [:inherited, :latin],
+     left_resolved_scripts: [:hntl, :latin], right_resolved_scripts: [:hntl, :latin],
+     unicode_version: "18.0.0", mappings: [
+       %{side: :left, byte_offset: 0, byte_length: 2, codepoint_index: 0,
+         codepoint_count: 1, codepoints: [0xE1], skeleton_spans: [%{codepoint_index: 0, codepoint_count: 1}, %{codepoint_index: 2, codepoint_count: 1}], mapping: "a\u0301"},
+       %{side: :left, byte_offset: 2, byte_length: 2, codepoint_index: 1,
+         codepoint_count: 1, codepoints: [0x327], skeleton_spans: [%{codepoint_index: 1, codepoint_count: 1}], mapping: "\u0326"},
+       %{side: :right, byte_offset: 0, byte_length: 2, codepoint_index: 0,
+         codepoint_count: 1, codepoints: [0xE1], skeleton_spans: [%{codepoint_index: 0, codepoint_count: 1}, %{codepoint_index: 2, codepoint_count: 1}], mapping: "a\u0301"},
+       %{side: :right, byte_offset: 2, byte_length: 2, codepoint_index: 1,
+         codepoint_count: 1, codepoints: [0x327], skeleton_spans: [%{codepoint_index: 1, codepoint_count: 1}], mapping: "\u0326"}
+     ]}},
+  {"normative bidi pair", :compare, ["A1<ש\u05C2", "Αש\u05BA>1"],
+   %UnicodeSecurity.Comparison{
+     confusable?: true, same_skeleton?: true, class: :mixed_script_confusable,
+     canonically_equivalent?: false, left_skeleton: "Al<ש\u0307", right_skeleton: "Al<ש\u0307",
+     left_scripts: [:common, :hebrew, :latin],
+     right_scripts: [:common, :greek, :hebrew],
+     left_resolved_scripts: [], right_resolved_scripts: [], unicode_version: "18.0.0",
+     mappings: [
+       %{side: :left, byte_offset: 0, byte_length: 1, codepoint_index: 0, codepoint_count: 1, codepoints: [?A], skeleton_spans: [%{codepoint_index: 0, codepoint_count: 1}], mapping: "A"},
+       %{side: :left, byte_offset: 1, byte_length: 1, codepoint_index: 1, codepoint_count: 1, codepoints: [?1], skeleton_spans: [%{codepoint_index: 1, codepoint_count: 1}], mapping: "l"},
+       %{side: :left, byte_offset: 2, byte_length: 1, codepoint_index: 2, codepoint_count: 1, codepoints: [?<], skeleton_spans: [%{codepoint_index: 2, codepoint_count: 1}], mapping: "<"},
+       %{side: :left, byte_offset: 3, byte_length: 2, codepoint_index: 3, codepoint_count: 1, codepoints: [0x5E9], skeleton_spans: [%{codepoint_index: 3, codepoint_count: 1}], mapping: "ש"},
+       %{side: :left, byte_offset: 5, byte_length: 2, codepoint_index: 4, codepoint_count: 1, codepoints: [0x5C2], skeleton_spans: [%{codepoint_index: 4, codepoint_count: 1}], mapping: "\u0307"},
+       %{side: :right, byte_offset: 0, byte_length: 2, codepoint_index: 0, codepoint_count: 1, codepoints: [0x391], skeleton_spans: [%{codepoint_index: 0, codepoint_count: 1}], mapping: "A"},
+       %{side: :right, byte_offset: 2, byte_length: 2, codepoint_index: 1, codepoint_count: 1, codepoints: [0x5E9], skeleton_spans: [%{codepoint_index: 3, codepoint_count: 1}], mapping: "ש"},
+       %{side: :right, byte_offset: 4, byte_length: 2, codepoint_index: 2, codepoint_count: 1, codepoints: [0x5BA], skeleton_spans: [%{codepoint_index: 4, codepoint_count: 1}], mapping: "\u0307"},
+       %{side: :right, byte_offset: 6, byte_length: 1, codepoint_index: 3, codepoint_count: 1, codepoints: [?>], skeleton_spans: [%{codepoint_index: 2, codepoint_count: 1}], mapping: "<"},
+       %{side: :right, byte_offset: 7, byte_length: 1, codepoint_index: 4, codepoint_count: 1, codepoints: [?1], skeleton_spans: [%{codepoint_index: 1, codepoint_count: 1}], mapping: "l"}
+     ]}}
+]}

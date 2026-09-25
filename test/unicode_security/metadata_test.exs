@@ -48,6 +48,12 @@ defmodule UnicodeSecurity.MetadataTest do
       UnicodeSecurity.check(<<255>>, type: :tenant_slug)
     %{__struct__: UnicodeSecurity.Result,policy: :permissive, verdict: :suspicious} =
       UnicodeSecurity.check("Acme & Co.", type: :organization_name)
+    %{__struct__: UnicodeSecurity.Comparison, class: :single_script_confusable,
+      same_skeleton?: true, confusable?: true} = UnicodeSecurity.compare("m", "rn")
+    true = UnicodeSecurity.conflicts?("m", ["rn"], type: :username)
+    %{__struct__: UnicodeSecurity.BatchResult,
+      collisions: [%{indexes: [0, 1]}], duplicates: []} =
+      UnicodeSecurity.check_many(["m", "rn"], type: :username)
     [%{__struct__: UnicodeSecurity.BatchItem,index: 0, input: nil,
       result: %{__struct__: UnicodeSecurity.Result,verdict: :dangerous,
         reasons: [%{code: :invalid_item_type, details: %{actual_type: :atom}}]}}] =
@@ -67,7 +73,12 @@ defmodule UnicodeSecurity.MetadataTest do
             UnicodeSecurity.Result,
             UnicodeSecurity.Reason,
             UnicodeSecurity.BatchItem,
+            UnicodeSecurity.BatchResult,
             UnicodeSecurity.Batch,
+            UnicodeSecurity.Batch.Groups,
+            UnicodeSecurity.Batch.Classes,
+            UnicodeSecurity.Collision,
+            UnicodeSecurity.Duplicate,
             UnicodeSecurity.Check,
             UnicodeSecurity.Policy,
             UnicodeSecurity.Profile,
@@ -78,6 +89,12 @@ defmodule UnicodeSecurity.MetadataTest do
             UnicodeSecurity.Restrictions,
             UnicodeSecurity.Scripts,
             UnicodeSecurity.Confusables,
+            UnicodeSecurity.Comparison,
+            UnicodeSecurity.ComparisonOptions,
+            UnicodeSecurity.Pair,
+            UnicodeSecurity.SkeletonTrace,
+            UnicodeSecurity.Conflict,
+            UnicodeSecurity.Conflicts,
             UnicodeSecurity.Bidi,
             UnicodeSecurity.Bidi.Explicit,
             UnicodeSecurity.Bidi.Weak,

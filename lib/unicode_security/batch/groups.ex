@@ -37,7 +37,7 @@ defmodule UnicodeSecurity.Batch.Groups do
     end
   end
 
-  @doc "Finalizes ordered duplicate and collision records."
+  @doc false
   @spec finish(state(), Policy.t()) :: BatchResult.t()
   def finish(state, policy) do
     %BatchResult{

@@ -66,8 +66,80 @@ Nonbinary input raises `ArgumentError`. Malformed UTF-8 and oversized inputs rai
 `UnicodeSecurity.InvalidInputError` with `reason` and a zero-based `byte_offset`;
 oversized inputs report offset 4,096. Generated output may exceed 4,096 bytes.
 
-IDNA/domain handling, pairwise classification, collection/batch APIs, and Ecto
-integration are planned later. Use the policy checks below for supported profiles.
+IDNA/domain handling and Ecto integration are planned later. The comparison and
+collection APIs below support the three current identifier profiles.
+
+## Compare names and inspect existing collections
+
+```elixir
+UnicodeSecurity.compare("m", "rn").class
+#=> :single_script_confusable
+UnicodeSecurity.same_skeleton?("é", "e\u0301")
+#=> true
+UnicodeSecurity.confusable?("é", "e\u0301")
+#=> false (canonical equivalence is not a confusable class)
+
+key = UnicodeSecurity.conflict_key("m", type: :username)
+#=> "rn"
+# Store the original identifier, key and Unicode version alongside an
+# application-owned unique index on the namespace and chosen identity column.
+UnicodeSecurity.conflicts?("m", ["rn", "unvisited"], type: :username)
+#=> true; stops at the first match
+UnicodeSecurity.conflicts("m", ["x", "rn", "m"], type: :username)
+#=> indexed Conflict structs for the matches at positions 1 and 2
+```
+
+`compare/2,3` returns two skeletons, canonical equivalence, observed ordinary
+Script lists, resolved augmented Script_Extensions sets, a class and original-input
+mapping evidence. `:all` denotes entirely neutral input; `[]` denotes an empty
+resolved intersection. A mapping records original zero-based byte offset and scalar
+index, the source scalar, its contribution and target skeleton spans in **scalar**
+coordinates. Removed scalars keep a mapping with empty spans. Reordering can split
+one source contribution into noncontiguous spans. The aggregate class is `:none`,
+`:single_script_confusable`, `:whole_script_confusable` or
+`:mixed_script_confusable`. Canonical equality has class `:none`.
+
+`compare/3`, `conflict_key/2`, `conflicts?/3` and `conflicts/3` accept only the
+`type` option (`:username`, `:tenant_slug`, `:organization_name`); they do not
+accept a policy preset or script overrides. The three current types use the same
+key. Invalid options fail before input validation. Inputs validate left to right;
+for existing collections the candidate validates before the enumerable. Visited
+existing values must be valid UTF-8 binaries within 4,096 bytes. `conflicts?/3`
+stops at the first match; `conflicts/3` consumes all values and retains repeated
+matches at their original indexes. Neither checks ownership or reserves a name.
+Preflight conflicts can race with writes, so the application still needs storage
+constraints and a transaction appropriate to its identity rules. Keep the original
+name and recompute/version stored keys when pinned Unicode data changes.
+
+```elixir
+batch = UnicodeSecurity.check_many(["m", "m", "rn"], type: :username)
+#=> one exact duplicate at [0, 1] and one skeleton collision at [0, 1, 2]
+Enum.map(batch.duplicates, & &1.indexes)
+#=> [[0, 1]]
+Enum.map(batch.collisions, & &1.indexes)
+#=> [[0, 1, 2]]
+
+UnicodeSecurity.check_many(["é", "e\u0301"], type: :username).collisions
+#=> one canonical-only key collision (class :none)
+
+UnicodeSecurity.audit(Stream.iterate(0, &(&1 + 1)), type: :tenant_slug)
+|> Enum.take(3)
+#=> three indexed BatchItems with invalid_item_type results; finite consumption
+```
+
+`audit/2` returns a lazy stream; configuration is checked at call time and items
+are checked only when consumed. A nonbinary item yields an `:invalid_item_type`
+Result with the original term preserved. Producer exceptions propagate. `check_many/2`
+eagerly consumes the enumerable and returns unchanged per-item Results plus ordered
+groups. Exact binary duplicates include invalid UTF-8 and oversized binaries;
+only valid inputs with a skeleton join collision groups. A collision requires two
+distinct original binaries; canonical-only collisions have class `:none`. A group
+can contain multiple classes, ordered by precedence `:mixed_script_confusable`,
+`:whole_script_confusable`, `:single_script_confusable`; its `class` is the first.
+Collection reasons carry group indexes and have preset severity critical/high/medium
+for strict/default/permissive collision findings, while exact duplicates have
+`:info`. They do not alter any per-item Result or verdict. Neither batch findings
+nor a safe per-item result decide identity, ownership or authorization.
 
 ## Policy checks
 
@@ -76,7 +148,7 @@ rewriting, or changing the stored name. Applications choose a profile and decide
 how to handle the returned verdict and reasons. A safe verdict describes this
 policy check; it does not establish identity, intent, authorization, or uniqueness.
 Skeleton equality is only a comparison signal. Keep the original value and version
-any persisted skeletons; comparison, collision and batch APIs are planned later.
+any persisted skeletons.
 
 ```elixir
 UnicodeSecurity.check("alice-smith", type: :username).verdict
@@ -406,11 +478,15 @@ mix docs --warnings-as-errors
 mix hex.build
 mix run bench/milestone_0.exs
 mix run bench/milestone_2.exs
+mix run bench/milestone_3.exs
 ```
 
-The benchmark warms each case and reports medians over 1,000 samples plus
-generated source and compiled BEAM sizes. Its fixed inputs make runs comparable;
-timing thresholds are not enforced across machines. Milestone 2 targets a warmed
+Milestone 2 warms each case and reports medians over 1,000 samples plus
+generated source and compiled BEAM sizes. Milestone 3 uses five warmups and 20
+samples, reporting time, process reductions, output bytes, a result checksum and
+memory after GC for comparison, streamed conflicts, 1k/2k/4k batches and a finite
+audit prefix. Fixed inputs make runs comparable; timing thresholds are not enforced
+across machines. Milestone 2 targets a warmed
 64-byte ASCII `check/2` median below 100 µs and includes both repeated MA-mapped
 ASCII and varied profile syntax, international names and 4,096-byte worst cases.
 Compile time can be measured

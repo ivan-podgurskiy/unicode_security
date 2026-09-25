@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Pairwise comparison, type-scoped conflict keys and existing-set conflict checks
+  with original scalar-to-skeleton mapping evidence and all three confusable classes.
+- Lazy indexed audit and eager batch analysis with separate exact duplicates and
+  skeleton collisions, ordered groups, collection reasons and literal contracts.
+- Milestone 3 collection benchmark and source-free acceptance for the new runtime APIs.
 - Original-input `check/2` Results and structured Reasons for username, tenant slug,
   and organization name profiles, with strict/default/permissive policies, script
   overrides, deterministic positions/order and explicit punctuation exceptions.
@@ -51,7 +56,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Unicode 18.0.0 sources remain draft; this milestone is not releasable.
 - Skeletons are comparison keys only, never replacements or authorization
-  decisions. Domains/IDNA, comparison/collision and batch APIs, and Ecto are planned
-  later; `type: :domain` remains unsupported.
+  decisions. Domains/IDNA and Ecto are planned later; `type: :domain` remains unsupported.
 
 [0.1.0]: https://github.com/ivan-podgurskiy/unicode_security/releases/tag/v0.1.0
