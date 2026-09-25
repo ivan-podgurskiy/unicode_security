@@ -79,7 +79,17 @@ for {name, input_size, function} <- cases do
   )
 end
 
+project_root = Path.expand("..", __DIR__)
 beam_root = Application.app_dir(:unicode_security, "ebin")
-beams = Path.wildcard(Path.join(beam_root, "Elixir.UnicodeSecurity*.beam"))
+
+beams =
+  Path.wildcard(Path.join(project_root, "lib/**/*.ex"))
+  |> Enum.map(fn path ->
+    [module] =
+      Regex.run(~r/defmodule ([\w.]+) do/, File.read!(path), capture: :all_but_first)
+
+    Path.join(beam_root, "Elixir.#{module}.beam")
+  end)
+
 beam_bytes = Enum.reduce(beams, 0, fn path, sum -> sum + File.stat!(path).size end)
-IO.puts("UnicodeSecurity runtime BEAMs: #{length(beams)} files, #{beam_bytes} bytes")
+IO.puts("Source-matched runtime BEAMs: #{length(beams)} files, #{beam_bytes} bytes")
