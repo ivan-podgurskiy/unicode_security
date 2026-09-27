@@ -11,6 +11,9 @@ defmodule UnicodeSecurity.MetadataTest do
 
     manifest = UnicodeSecurity.data_manifest()
     assert manifest.release_status == :draft
+    assert length(manifest.sources) == 21
+    assert Enum.count(manifest.sources, &(&1.status == :draft)) == 19
+    assert Enum.count(manifest.sources, &(&1.status == :final)) == 2
 
     {lock, []} = Code.eval_file("priv/unicode/sources.lock")
     declarations = Enum.sort_by(Source.sources(), & &1.name)
@@ -20,7 +23,7 @@ defmodule UnicodeSecurity.MetadataTest do
     |> Enum.each(fn {source, declaration} ->
       assert source == Map.merge(declaration, Map.fetch!(lock, declaration.name))
       assert source.version == "18.0.0"
-      assert source.status == :draft
+      assert source.status == declaration.status
       assert source.bytes > 0
       assert source.sha256 =~ ~r/\A[0-9a-f]{64}\z/
       assert Enum.sort(Map.keys(source)) == [:bytes, :name, :sha256, :status, :url, :version]
@@ -40,7 +43,11 @@ defmodule UnicodeSecurity.MetadataTest do
     :d = UnicodeSecurity.Data.Profile.joining_type(0x628)
     [0xE9] = UnicodeSecurity.Normalization.nfc_scalars([?e, 0x301])
     %{release_status: :draft, sources: sources} = UnicodeSecurity.data_manifest()
-    19 = length(sources)
+    21 = length(sources)
+    19 = Enum.count(sources, &(&1.status == :draft))
+    2 = Enum.count(sources, &(&1.status == :final))
+    {:mapped, [?a]} = UnicodeSecurity.Data.Idna.lookup(?A)
+    18 = UnicodeSecurity.Data.Idna.maximum_mapping_length()
     %{__struct__: UnicodeSecurity.Result,verdict: :safe, skeleton: "rn", reasons: []} =
       UnicodeSecurity.check("m", type: :username)
     %{__struct__: UnicodeSecurity.Result,verdict: :dangerous, valid_input?: false,
@@ -66,6 +73,7 @@ defmodule UnicodeSecurity.MetadataTest do
       for module <- [
             UnicodeSecurity,
             UnicodeSecurity.Data.Manifest,
+            UnicodeSecurity.Data.Idna,
             UnicodeSecurity.Data.Profile,
             UnicodeSecurity.Data.Composition,
             UnicodeSecurity.Data.Normalization,

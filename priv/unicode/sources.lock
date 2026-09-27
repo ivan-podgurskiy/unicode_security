@@ -62,5 +62,13 @@
   "confusables.txt" => %{
     bytes: 763128,
     sha256: "6ed3ee967c9dfdf6677d563c9985182fbc50a2efb7d6059cd57b2e2ce18f5b92"
+  },
+  "IdnaMappingTable.txt" => %{
+    bytes: 801680,
+    sha256: "a03b1eb38032268c696406a83f0972d6a815acd2c8d4151d42ec0fda70ffced1"
+  },
+  "IdnaTestV2.txt" => %{
+    bytes: 776565,
+    sha256: "0236b75c5b20dfd857b3b5cf75509887959d6ab00d6c7bda9b7dc3df518c1fde"
   }
 }

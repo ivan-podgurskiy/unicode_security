@@ -4,8 +4,52 @@ defmodule UnicodeSecurity.GeneratorTest do
   alias UnicodeSecurity.Data.Normalization
   alias UnicodeSecurity.Test.ElixirRunner
   alias UnicodeSecurity.UnicodeData.Generator
+  alias UnicodeSecurity.UnicodeData.IdnaGenerator
   alias UnicodeSecurity.UnicodeData.IdentifierGenerator
   alias UnicodeSecurity.UnicodeData.Source
+
+  test "reproduces IDNA data deterministically and validates all sources before writing" do
+    first = Generator.generate_idna!("priv/unicode/18.0.0-draft", temporary_directory())
+    second = Generator.generate_idna!("priv/unicode/18.0.0-draft", temporary_directory())
+    assert File.read!(first) == File.read!(second)
+    assert File.read!(first) == File.read!("lib/unicode_security/data/idna.ex")
+
+    root = temporary_directory()
+    sources = write_sources!(root)
+    File.write!(Path.join(sources, "IdnaTestV2.txt"), "tampered")
+
+    assert_raise ArgumentError, fn ->
+      Generator.generate_idna!(sources, Path.join(root, "output"))
+    end
+
+    refute File.exists?(Path.join(root, "output"))
+  end
+
+  test "rejects IDNA payloads that overflow packed counts or introduce unrecognized separators" do
+    assert_raise ArgumentError, fn ->
+      IdnaGenerator.render!([{0, 0x10FFFF, :mapped, List.duplicate(?a, 65_536)}])
+    end
+
+    assert_raise ArgumentError, fn ->
+      IdnaGenerator.render!([{0, 0x10FFFF, :mapped, [?.]}])
+    end
+  end
+
+  test "empty IDNA mappings retain a minimum expansion bound of one" do
+    root = temporary_directory()
+    File.mkdir_p!(root)
+    path = Path.join(root, "idna.ex")
+    File.write!(path, IdnaGenerator.render!([{0, 0x10FFFF, :disallowed, []}]))
+
+    verification = """
+    [{UnicodeSecurity.Data.Idna, _}] = Code.compile_file(#{inspect(path)})
+    1 = UnicodeSecurity.Data.Idna.maximum_mapping_length()
+    {:disallowed, []} = UnicodeSecurity.Data.Idna.lookup(0)
+    {:disallowed, []} = UnicodeSecurity.Data.Idna.lookup(0x10FFFF)
+    """
+
+    assert {"", 0} = ElixirRunner.run(verification)
+  end
 
   test "reproduces the complete locked identifier corpus including canonical rescue data" do
     output = Generator.generate_identifier!("priv/unicode/18.0.0-draft", temporary_directory())
@@ -246,6 +290,7 @@ defmodule UnicodeSecurity.GeneratorTest do
           "numbers.ex",
           "profile.ex",
           "composition.ex",
+          "idna.ex",
           "manifest.ex"
         ] do
       path = Path.join(root, "lib/unicode_security/data/#{name}")
@@ -276,6 +321,7 @@ defmodule UnicodeSecurity.GeneratorTest do
           "numbers.ex",
           "profile.ex",
           "composition.ex",
+          "idna.ex",
           "manifest.ex"
         ],
         fn name ->
@@ -439,6 +485,8 @@ defmodule UnicodeSecurity.GeneratorTest do
     )
 
     File.write!(Path.join(source_directory, "NormalizationTest.txt"), "# fixture\n")
+    File.write!(Path.join(source_directory, "IdnaMappingTable.txt"), "0000..10FFFF ; valid\n")
+    File.write!(Path.join(source_directory, "IdnaTestV2.txt"), "# Version: 18.0.0\n")
 
     for {name, body} <- [
           {"PropertyValueAliases", "sc; Latn; Latin\nsc; Cyrl; Cyrillic\nsc; Zzzz; Unknown\n"},
@@ -511,6 +559,7 @@ defmodule UnicodeSecurity.GeneratorTest do
     Generator.generate_numbers!(source_directory, output_directory)
     Generator.generate_profile!(source_directory, output_directory)
     Generator.generate_composition!(source_directory, output_directory)
+    Generator.generate_idna!(source_directory, output_directory)
     Generator.generate_manifest!(source_directory, output_directory)
     root
   end

@@ -117,6 +117,18 @@ defmodule UnicodeSecurity.UnicodeData.Source do
       url: "https://www.unicode.org/Public/18.0.0/ucd/BidiCharacterTest.txt",
       version: "18.0.0",
       status: :draft
+    },
+    %{
+      name: "IdnaMappingTable.txt",
+      url: "https://www.unicode.org/Public/18.0.0/idna/IdnaMappingTable.txt",
+      version: "18.0.0",
+      status: :final
+    },
+    %{
+      name: "IdnaTestV2.txt",
+      url: "https://www.unicode.org/Public/18.0.0/idna/IdnaTestV2.txt",
+      version: "18.0.0",
+      status: :final
     }
   ]
 
@@ -220,8 +232,8 @@ defmodule UnicodeSecurity.UnicodeData.Source do
         raise ArgumentError, "unsupported Unicode version: #{inspect(declaration.version)}"
       end
 
-      unless declaration.status == :draft do
-        raise ArgumentError, "unsupported Unicode source status: #{inspect(declaration.status)}"
+      unless declaration.status in [:draft, :final] do
+        raise ArgumentError, "unsupported Unicode source status"
       end
 
       unless is_binary(declaration.name) and Path.basename(declaration.name) == declaration.name do

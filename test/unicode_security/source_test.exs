@@ -89,7 +89,16 @@ defmodule UnicodeSecurity.SourceTest do
 
   test "declares exactly four additional official draft Unicode 18 profile sources" do
     sources = Source.sources()
-    assert length(sources) == 19
+    assert length(sources) == 21
+    assert Enum.count(sources, &(&1.status == :draft)) == 19
+    assert Enum.count(sources, &(&1.status == :final)) == 2
+
+    for name <- ["IdnaMappingTable.txt", "IdnaTestV2.txt"] do
+      assert %{url: url, version: "18.0.0", status: :final} =
+               Enum.find(sources, &(&1.name == name))
+
+      assert url == "https://www.unicode.org/Public/18.0.0/idna/" <> name
+    end
 
     for {name, suffix} <- [
           {"DerivedNormalizationProps.txt", "DerivedNormalizationProps.txt"},
@@ -119,6 +128,15 @@ defmodule UnicodeSecurity.SourceTest do
     assert :ok = Source.verify!(declarations, directory, lock)
     assert lock["sample.txt"].bytes == 27
     assert byte_size(lock["sample.txt"].sha256) == 64
+  end
+
+  test "accepts final source declarations when locking verified bytes" do
+    directory = temporary_directory()
+    File.mkdir_p!(directory)
+    File.write!(Path.join(directory, "sample.txt"), "Version: 18.0.0\n")
+    declarations = [%{name: "sample.txt", version: "18.0.0", status: :final}]
+    lock = Source.lock!(declarations, directory)
+    assert :ok = Source.verify!(declarations, directory, lock)
   end
 
   test "rejects changed source bytes" do
@@ -276,7 +294,7 @@ defmodule UnicodeSecurity.SourceTest do
 
     for sources <- [
           [%{source | version: "17.0.0"}],
-          [%{source | status: :final}],
+          [%{source | status: :unsupported}],
           [%{source | name: "../sample.txt"}],
           [source, source],
           [%{source | url: nil}]

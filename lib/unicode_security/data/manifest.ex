@@ -95,6 +95,22 @@ defmodule UnicodeSecurity.Data.Manifest do
           status: :draft
         },
         %{
+          name: "IdnaMappingTable.txt",
+          url: "https://www.unicode.org/Public/18.0.0/idna/IdnaMappingTable.txt",
+          version: "18.0.0",
+          bytes: 801_680,
+          sha256: "a03b1eb38032268c696406a83f0972d6a815acd2c8d4151d42ec0fda70ffced1",
+          status: :final
+        },
+        %{
+          name: "IdnaTestV2.txt",
+          url: "https://www.unicode.org/Public/18.0.0/idna/IdnaTestV2.txt",
+          version: "18.0.0",
+          bytes: 776_565,
+          sha256: "0236b75c5b20dfd857b3b5cf75509887959d6ab00d6c7bda9b7dc3df518c1fde",
+          status: :final
+        },
+        %{
           name: "IndicSyllabicCategory.txt",
           url: "https://www.unicode.org/Public/18.0.0/ucd/IndicSyllabicCategory.txt",
           version: "18.0.0",

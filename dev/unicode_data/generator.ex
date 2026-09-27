@@ -3,6 +3,8 @@ defmodule UnicodeSecurity.UnicodeData.Generator do
 
   alias UnicodeSecurity.UnicodeData.IdentifierGenerator
   alias UnicodeSecurity.UnicodeData.IdentifierParser
+  alias UnicodeSecurity.UnicodeData.IdnaGenerator
+  alias UnicodeSecurity.UnicodeData.IdnaParser
   alias UnicodeSecurity.UnicodeData.Packer
   alias UnicodeSecurity.UnicodeData.Parser
   alias UnicodeSecurity.UnicodeData.ProfileGenerator
@@ -11,6 +13,20 @@ defmodule UnicodeSecurity.UnicodeData.Generator do
   alias UnicodeSecurity.UnicodeData.Source
 
   @output_name "normalization.ex"
+
+  @spec generate_idna!(Path.t(), Path.t()) :: Path.t()
+  def generate_idna!(source_directory, output_directory) do
+    verify_sources!(source_directory)
+
+    contents =
+      source_directory
+      |> Path.join("IdnaMappingTable.txt")
+      |> File.read!()
+      |> IdnaParser.parse!()
+      |> IdnaGenerator.render!()
+
+    write_output!(output_directory, "idna.ex", contents)
+  end
 
   @spec generate_profile!(Path.t(), Path.t()) :: Path.t()
   def generate_profile!(source_directory, output_directory) do

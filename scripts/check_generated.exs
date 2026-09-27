@@ -20,7 +20,8 @@ try do
       Generator.generate_identifier!(source_directory, temporary_directory),
       Generator.generate_numbers!(source_directory, temporary_directory),
       Generator.generate_profile!(source_directory, temporary_directory),
-      Generator.generate_composition!(source_directory, temporary_directory)
+      Generator.generate_composition!(source_directory, temporary_directory),
+      Generator.generate_idna!(source_directory, temporary_directory)
     ]
 
     Enum.each(paths, fn generated_path ->
