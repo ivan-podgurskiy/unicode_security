@@ -5,7 +5,12 @@ defmodule UnicodeSecurity.Policy do
   alias UnicodeSecurity.Reason
   alias UnicodeSecurity.Result
 
-  @defaults %{username: :default, tenant_slug: :default, organization_name: :permissive}
+  @defaults %{
+    username: :default,
+    tenant_slug: :default,
+    organization_name: :permissive,
+    domain: :strict
+  }
   @minimums %{
     strict: :highly_restrictive,
     default: :moderately_restrictive,
@@ -40,7 +45,18 @@ defmodule UnicodeSecurity.Policy do
     bidi_control: {:critical, :high, :high},
     mixed_scripts: {:high, :medium, :low},
     mixed_numbers: {:high, :medium, :low},
-    restriction_level_below_policy: {:high, :medium, :low}
+    restriction_level_below_policy: {:high, :medium, :low},
+    domain_empty_label: {:critical, :high, :high},
+    domain_invalid_alabel: {:critical, :high, :high},
+    domain_idna_disallowed: {:critical, :high, :high},
+    domain_hyphen_rule: {:critical, :high, :high},
+    domain_bidi_rule: {:critical, :high, :high},
+    domain_joiner_rule: {:critical, :high, :high},
+    domain_label_too_long: {:critical, :high, :high},
+    domain_name_too_long: {:critical, :high, :high},
+    domain_invalid_ascii: {:critical, :high, :high},
+    domain_invalid_hostname: {:critical, :high, :high},
+    domain_deviation_character: {:medium, :low, :info}
   }
 
   @type t :: %{

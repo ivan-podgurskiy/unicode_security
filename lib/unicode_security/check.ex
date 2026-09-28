@@ -6,6 +6,7 @@ defmodule UnicodeSecurity.Check do
   alias UnicodeSecurity.Data.Numbers
   alias UnicodeSecurity.Data.Profile, as: ProfileData
   alias UnicodeSecurity.Data.Scripts, as: ScriptsData
+  alias UnicodeSecurity.Domain
   alias UnicodeSecurity.Identifier
   alias UnicodeSecurity.InvalidInputError
   alias UnicodeSecurity.JoinControls
@@ -56,7 +57,11 @@ defmodule UnicodeSecurity.Check do
 
   defp decode_result(input, policy, result) do
     decoded = Utf8.decode!(input)
-    analyze(decoded, policy, result)
+
+    case policy.type do
+      :domain -> Domain.check_decoded(input, decoded, policy, result)
+      _ -> analyze_decoded(decoded, policy, result)
+    end
   rescue
     error in InvalidInputError ->
       details = error_details(error.reason, input, error.byte_offset)
@@ -70,7 +75,10 @@ defmodule UnicodeSecurity.Check do
   defp error_details(:invalid_utf8, input, offset),
     do: %{invalid_byte: :binary.at(input, offset)}
 
-  defp analyze(decoded, policy, result) do
+  @doc false
+  @spec analyze_decoded([{non_neg_integer(), non_neg_integer()}], Policy.t(), Result.t()) ::
+          Result.t()
+  def analyze_decoded(decoded, policy, result) do
     scalars = Enum.map(decoded, &elem(&1, 0))
     # Observed scripts, intersections and decimal systems are duplicate-invariant.
     distinct_scalars = Enum.uniq(scalars)

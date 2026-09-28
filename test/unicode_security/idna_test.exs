@@ -85,4 +85,43 @@ defmodule UnicodeSecurity.IdnaTest do
     assert Enum.any?(leading_mark.issues, &(&1.origin == 12 and &1.details.rule == :leading_mark))
     assert Enum.at(leading_mark.labels, 1).unicode == [?a]
   end
+
+  test "hostname root metadata retains ignored-suffix fallback origin" do
+    for scalars <- [~c"a.", [?a, ?., 0x00AD]] do
+      report = Idna.process_tagged(Enum.with_index(scalars), :hostname)
+      assert report.valid?
+      assert report.trailing_dot?
+      assert report.ascii == "a."
+      assert [first, root] = report.labels
+      refute first.root?
+      assert root.root? and root.unicode == [] and root.ascii == ""
+      assert root.issues == []
+    end
+
+    assert {:error, issues} = Idna.to_ascii([?a, ?., 0x00AD])
+    assert Enum.any?(issues, &(&1.code == :domain_empty_label and &1.origin == 2))
+
+    assert Idna.process_tagged(Enum.with_index([?a, ?., 0x00AD]), :hostname).labels
+           |> List.last()
+           |> Map.fetch!(:root?)
+
+    refute Idna.process_tagged(Enum.with_index(~c"."), :hostname).valid?
+  end
+
+  test "overlong mapped A-label has exact length and safe neighbor in both ASCII modes" do
+    scalars = String.to_charlist("ｘｎ－－" <> String.duplicate("a", 60) <> ".ok")
+
+    for mode <- [:ascii, :hostname] do
+      report = Idna.process_tagged(Enum.with_index(scalars), mode)
+      refute report.valid?
+      assert [overlong, neighbor] = report.labels
+      assert overlong.ascii == nil
+      assert neighbor.valid? and neighbor.ascii == "ok"
+
+      assert Enum.any?(overlong.issues, fn issue ->
+               issue.code == :domain_label_too_long and
+                 issue.details == %{actual_bytes: 64, maximum_bytes: 63}
+             end)
+    end
+  end
 end

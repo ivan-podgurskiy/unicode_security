@@ -124,7 +124,7 @@ defmodule UnicodeSecurity.AuditTest do
 
     for options <- [
           [],
-          [type: :domain],
+          [type: :unknown],
           [type: :username, policy: :unknown],
           [type: :username, type: :username],
           [type: :username, unknown: :value],
@@ -143,6 +143,14 @@ defmodule UnicodeSecurity.AuditTest do
     assert_raise ArgumentError, "unsupported or missing type", fn ->
       UnicodeSecurity.audit(123, [])
     end
+  end
+
+  test "audit applies domain checks through the shared policy" do
+    [item] = UnicodeSecurity.audit(["BÜCHER。a."], type: :domain) |> Enum.to_list()
+    assert item.result.valid_input?
+    assert item.result.policy == :strict
+    assert item.result.domain.ascii == "xn--bcher-kva.a."
+    assert item.result.skeleton != nil
   end
 
   test "audit retains term identity, map entries, and producer exceptions" do

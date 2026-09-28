@@ -3,7 +3,7 @@ defmodule UnicodeSecurity do
   Unicode identifier security primitives backed by pinned Unicode data.
 
   Provides `skeleton/1`, script, number, and restriction-level detection, identifier
-  properties, `check/2` policy Results/Reasons for three profiles, and compiled-data
+  properties, `check/2` policy Results/Reasons for identifiers and domains, and compiled-data
   metadata. A skeleton is a comparison key only. It must never serve as a canonical
   identifier, replacement value, or authorization decision. Matching keys do not
   establish identity or intent.
@@ -24,10 +24,11 @@ defmodule UnicodeSecurity do
   @doc """
   Analyzes an identifier and returns original-input facts and policy findings.
 
-  Requires `type: :username`, `:tenant_slug`, or `:organization_name`; domains
-  are not supported in this milestone. `policy` selects `:strict`, `:default`,
+  Requires `type: :username`, `:tenant_slug`, `:organization_name`, or `:domain`.
+  `policy` selects `:strict`, `:default`,
   or `:permissive`. Usernames and tenant slugs default to `:default`;
-  organization names default to `:permissive`. Optional `allowed_scripts` and
+  organization names default to `:permissive`; domains default to `:strict`.
+  Optional `allowed_scripts` and
   `denied_scripts` accept ordinary script atoms from the pinned data. An omitted
   allowlist permits all scripts; an explicit empty list permits neutral scalars
   only. Multivalued Script_Extensions pass if a permitted candidate survives.
@@ -44,10 +45,19 @@ defmodule UnicodeSecurity do
   punctuation-separated runs, preventing composition across separators.
   Organization whitespace and punctuation allowances affect syntax only.
 
+  Domain checks apply pinned UTS #46 hostname processing to the complete input,
+  retain each original label and optional final root, then analyze normalized
+  non-root labels separately. The whole-domain skeleton escapes literal dots
+  and percent signs inside label skeletons so they cannot imitate boundaries.
+  IDNA or hostname failures keep safe partial label facts but leave whole-name
+  Unicode, ASCII, and skeleton values nil. Domain validity is independent of
+  the selected security policy.
+
   Every binary with valid configuration returns `UnicodeSecurity.Result`,
   including empty, malformed UTF-8 and input over 4,096 original bytes. Partial
-  results retain `nil` facts. Empty input is fully analyzed with a high-severity
-  finding. Positions are original zero-based byte/scalar indexes; global
+  results retain `nil` facts. For generic types, empty input is fully analyzed
+  with a high-severity finding; for domains it is an invalid empty label.
+  Positions are original zero-based byte/scalar indexes; global
   findings follow positional findings. Reasons sort by original byte offset, code,
   and deterministic details. See `UnicodeSecurity.Reason` for all codes, details
   and severities. The highest severity determines verdict.

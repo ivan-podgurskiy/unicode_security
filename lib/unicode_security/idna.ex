@@ -74,9 +74,13 @@ defmodule UnicodeSecurity.Idna do
       |> Enum.map(fn {label_index, local, rule} ->
         label = Enum.at(labels, label_index)
 
-        issue(:domain_bidi_rule, label_index, label_origin(label, local), label_scope(label), %{
-          rule: rule
-        })
+        details =
+          if is_integer(local) and is_list(label.unicode),
+            do: %{rule: rule, codepoint: Enum.at(label.unicode, local)},
+            else: %{rule: rule}
+
+        scope = if(is_nil(local), do: :label, else: label_scope(label))
+        issue(:domain_bidi_rule, label_index, label_origin(label, local), scope, details)
       end)
 
     labels =
@@ -288,9 +292,12 @@ defmodule UnicodeSecurity.Idna do
     label_issues =
       LabelRules.issues(scalars)
       |> Enum.map(fn {code, local, rule} ->
-        issue(code, index, local_origin(tagged, local, fallback), scope(alabel?, local), %{
-          rule: rule
-        })
+        details =
+          if is_integer(local),
+            do: %{rule: rule, codepoint: Enum.at(scalars, local)},
+            else: %{rule: rule}
+
+        issue(code, index, local_origin(tagged, local, fallback), scope(alabel?, local), details)
       end)
 
     joiner_issues =
@@ -302,15 +309,15 @@ defmodule UnicodeSecurity.Idna do
           index,
           local_origin(tagged, local, fallback),
           scope(alabel?, local),
-          %{rule: :contextj}
+          %{rule: :contextj, codepoint: Enum.at(scalars, local)}
         )
       end)
 
     deviations =
       tagged
       |> Enum.filter(fn {scalar, _} -> elem(Table.lookup(scalar), 0) == :deviation end)
-      |> Enum.map(fn {_scalar, origin} ->
-        issue(:domain_deviation_character, index, origin, scope(alabel?, 0), %{})
+      |> Enum.map(fn {scalar, origin} ->
+        issue(:domain_deviation_character, index, origin, scope(alabel?, 0), %{codepoint: scalar})
       end)
 
     issues = Enum.uniq(label_issues ++ joiner_issues ++ deviations)

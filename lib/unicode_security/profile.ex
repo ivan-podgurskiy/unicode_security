@@ -45,6 +45,7 @@ defmodule UnicodeSecurity.Profile do
   @spec exception?(Result.input_type(), non_neg_integer()) :: boolean()
   def exception?(:username, scalar), do: scalar in [?_, ?-, ?.]
   def exception?(:tenant_slug, scalar), do: scalar == ?-
+  def exception?(:domain, scalar), do: scalar == ?-
   def exception?(:organization_name, _scalar), do: false
 
   # Keep punctuation as a normalization boundary: deleting it could rescue

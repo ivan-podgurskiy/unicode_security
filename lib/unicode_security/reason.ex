@@ -36,6 +36,16 @@ defmodule UnicodeSecurity.Reason do
     the decision uses membership extended only by explicit punctuation exceptions.
   - `:exact_duplicate`, `:skeleton_collision`, and the three confusable classes:
     `%{indexes: ordered_zero_based_indexes}` in eager batch collections only.
+  - Domain validity codes are `:domain_empty_label`, `:domain_invalid_alabel`,
+    `:domain_idna_disallowed`, `:domain_hyphen_rule`, `:domain_bidi_rule`,
+    `:domain_joiner_rule`, `:domain_label_too_long`, `:domain_name_too_long`,
+    `:domain_invalid_ascii`, and `:domain_invalid_hostname`.
+    `:domain_deviation_character` is advisory. Every domain detail includes
+    `label_index`, original `label`, and `original_byte_offset`; global findings
+    use nil values. Positional findings include `source_scope: :scalar | :label`.
+    `codepoint`, when present, names the scalar that triggered the rule after
+    IDNA mapping or A-label decoding. Rules and limits are in the specific
+    domain finding's details.
 
   ## Severities
 
@@ -48,6 +58,8 @@ defmodule UnicodeSecurity.Reason do
   | mixed_scripts, mixed_numbers, restriction_level_below_policy | high | medium | low |
   | single_script_confusable, mixed_script_confusable, whole_script_confusable, skeleton_collision | critical | high | medium |
   | exact_duplicate | info | info | info |
+  | domain validity codes | critical | high | high |
+  | domain_deviation_character | medium | low | info |
 
   No reasons or only `:info` means safe, `:low`/`:medium` suspicious, and
   `:high`/`:critical` dangerous. Current checks do not emit collision or generic
@@ -77,6 +89,17 @@ defmodule UnicodeSecurity.Reason do
           | :whole_script_confusable
           | :skeleton_collision
           | :exact_duplicate
+          | :domain_empty_label
+          | :domain_invalid_alabel
+          | :domain_idna_disallowed
+          | :domain_hyphen_rule
+          | :domain_bidi_rule
+          | :domain_joiner_rule
+          | :domain_label_too_long
+          | :domain_name_too_long
+          | :domain_invalid_ascii
+          | :domain_deviation_character
+          | :domain_invalid_hostname
   @type severity :: :info | :low | :medium | :high | :critical
   @type syntax_rule :: :whitespace | :punctuation | :unsupported_category
   @type actual_type ::
@@ -107,6 +130,7 @@ defmodule UnicodeSecurity.Reason do
               actual: UnicodeSecurity.Result.restriction_level(),
               minimum: UnicodeSecurity.Result.restriction_level()
             }
+          | map()
   @type t :: %__MODULE__{
           code: code() | nil,
           severity: severity() | nil,

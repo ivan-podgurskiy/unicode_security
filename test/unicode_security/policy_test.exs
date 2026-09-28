@@ -62,7 +62,8 @@ defmodule UnicodeSecurity.PolicyTest do
     for {type, preset, minimum} <- [
           {:username, :default, :moderately_restrictive},
           {:tenant_slug, :default, :moderately_restrictive},
-          {:organization_name, :permissive, :minimally_restrictive}
+          {:organization_name, :permissive, :minimally_restrictive},
+          {:domain, :strict, :highly_restrictive}
         ] do
       assert Policy.resolve!(type: type) == %{
                type: type,
@@ -109,7 +110,6 @@ defmodule UnicodeSecurity.PolicyTest do
           [type: :username, type: :username],
           [type: :username, allowed_scripts: [], allowed_scripts: []],
           [type: :username, denied_scripts: [], denied_scripts: []],
-          [type: :domain],
           [type: :unknown],
           [type: nil],
           [type: "username"],
@@ -174,6 +174,31 @@ defmodule UnicodeSecurity.PolicyTest do
       assert Policy.severity(:default, code) == default
       assert Policy.severity(:permissive, code) == permissive
     end
+  end
+
+  test "domain validity and deviation findings use their distinct severity rows" do
+    validity = [
+      :domain_empty_label,
+      :domain_invalid_alabel,
+      :domain_idna_disallowed,
+      :domain_hyphen_rule,
+      :domain_bidi_rule,
+      :domain_joiner_rule,
+      :domain_label_too_long,
+      :domain_name_too_long,
+      :domain_invalid_ascii,
+      :domain_invalid_hostname
+    ]
+
+    for code <- validity do
+      assert Policy.severity(:strict, code) == :critical
+      assert Policy.severity(:default, code) == :high
+      assert Policy.severity(:permissive, code) == :high
+    end
+
+    assert Policy.severity(:strict, :domain_deviation_character) == :medium
+    assert Policy.severity(:default, :domain_deviation_character) == :low
+    assert Policy.severity(:permissive, :domain_deviation_character) == :info
   end
 
   test "verdict uses the highest severity irrespective of reason ordering" do

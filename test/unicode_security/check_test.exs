@@ -138,7 +138,6 @@ defmodule UnicodeSecurity.CheckTest do
           [:type],
           [{"type", :username}],
           [{:type, :username, :extra}],
-          [type: :domain],
           [type: :unknown],
           [type: nil],
           [type: "username"],

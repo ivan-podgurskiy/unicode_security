@@ -12,6 +12,8 @@ defmodule UnicodeSecurity.ScriptsTest do
   @extensions "# ScriptExtensions-18.0.0.txt\n# @missing: 0000..10FFFF; <script>\n"
 
   test "recognizes every canonical script name from the independently read pinned aliases" do
+    Code.ensure_loaded!(Data)
+
     expected_names =
       reference_lines("PropertyValueAliases.txt")
       |> Enum.flat_map(fn
