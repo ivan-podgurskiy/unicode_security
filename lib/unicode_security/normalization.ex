@@ -53,32 +53,42 @@ defmodule UnicodeSecurity.Normalization do
   @spec nfc_scalars([0..0x10FFFF]) :: [0..0x10FFFF]
   def nfc_scalars(scalars), do: scalars |> nfd_scalars() |> recompose(nil, [], 0, [])
 
+  @doc false
+  @spec nfc_tagged([{0..0x10FFFF, non_neg_integer()}]) ::
+          [{0..0x10FFFF, non_neg_integer()}]
+  def nfc_tagged(values), do: values |> nfd_tagged() |> recompose(nil, [], 0, [])
+
   # Keep the starter separately so composing across intervening marks is linear.
   defp recompose([], nil, _marks, _class, acc), do: Enum.reverse(acc)
   defp recompose([], starter, marks, _class, acc), do: Enum.reverse(marks ++ [starter | acc])
 
-  defp recompose([scalar | rest], starter, marks, previous_class, acc) do
-    class = Data.combining_class(scalar)
+  defp recompose([value | rest], starter, marks, previous_class, acc) do
+    class = Data.combining_class(scalar_value(value))
 
     composite =
       if starter != nil and (previous_class == 0 or previous_class < class),
-        do: compose(starter, scalar)
+        do: compose(scalar_value(starter), scalar_value(value))
 
     cond do
       composite != nil ->
-        recompose(rest, composite, marks, previous_class, acc)
+        recompose(rest, composed_value(composite, starter, value), marks, previous_class, acc)
 
       class == 0 ->
         flushed = if starter == nil, do: acc, else: marks ++ [starter | acc]
-        recompose(rest, scalar, [], 0, flushed)
+        recompose(rest, value, [], 0, flushed)
 
       starter == nil ->
-        recompose(rest, nil, [], class, [scalar | acc])
+        recompose(rest, nil, [], class, [value | acc])
 
       true ->
-        recompose(rest, starter, [scalar | marks], class, acc)
+        recompose(rest, starter, [value | marks], class, acc)
     end
   end
+
+  defp composed_value(code, {_left, left_origin}, {_right, right_origin}),
+    do: {code, min(left_origin, right_origin)}
+
+  defp composed_value(code, _left, _right), do: code
 
   defp compose(leading, vowel) when leading in 0x1100..0x1112 and vowel in 0x1161..0x1175,
     do: @s_base + ((leading - @l_base) * @v_count + vowel - @v_base) * @t_count

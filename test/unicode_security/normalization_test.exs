@@ -68,6 +68,38 @@ defmodule UnicodeSecurity.NormalizationTest do
     assert Normalization.nfc_scalars([0x1100, 0x1161, 0x11A8]) == [0xAC01]
   end
 
+  test "tagged NFC keeps the earliest contributor through reorder and Hangul" do
+    assert Normalization.nfc_tagged([{?e, 4}, {0x301, 7}]) == [{0xE9, 4}]
+
+    assert Normalization.nfc_tagged([{0x1100, 3}, {0x1161, 5}, {0x11A8, 2}]) ==
+             [{0xAC01, 2}]
+
+    assert Normalization.nfc_tagged([{?A, 9}, {0x301, 5}, {0x323, 2}]) ==
+             [{0x1EA0, 2}, {0x301, 5}]
+  end
+
+  test "tagged NFC preserves blocked and leading marks and agrees with scalar NFC" do
+    cases = [
+      [],
+      [{0x301, 7}, {0x323, 3}, {?q, 8}],
+      [{?A, 9}, {0x305, 2}, {0x301, 1}],
+      [{0x1100, 5}, {0x301, 3}, {0x1161, 2}],
+      [{0xAC00, 8}, {0x11A8, 4}],
+      [{0x1E0A, 5}, {0x323, 1}]
+    ]
+
+    assert Normalization.nfc_tagged([{?A, 9}, {0x305, 2}, {0x301, 1}]) ==
+             [{?A, 9}, {0x305, 2}, {0x301, 1}]
+
+    assert Normalization.nfc_tagged([{0x301, 7}, {0x323, 3}, {?q, 8}]) ==
+             [{0x323, 3}, {0x301, 7}, {?q, 8}]
+
+    for tagged <- cases do
+      assert Enum.map(Normalization.nfc_tagged(tagged), &elem(&1, 0)) ==
+               Normalization.nfc_scalars(Enum.map(tagged, &elem(&1, 0)))
+    end
+  end
+
   test "satisfies every official NFC invariant" do
     rows =
       Enum.reduce(UnicodeFixtures.normalization_rows(), 0, fn {line, [c1, c2, c3, c4, c5]},
