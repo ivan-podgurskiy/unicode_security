@@ -5,7 +5,9 @@ defmodule UnicodeSecurity.Comparison do
   `left_scripts` and `right_scripts` contain ordinary observed Script properties.
   Resolved scripts contain the augmented Script_Extensions intersection used to
   classify confusables; `:all` denotes wholly neutral input. A matching skeleton
-  is a comparison fact, never an identity or authorization verdict.
+  is a comparison fact, never an identity or authorization verdict. For explicit
+  domain comparisons, changed IDNA labels determine the confusable class and
+  mapping records cover original labels and separators.
   """
 
   defstruct [

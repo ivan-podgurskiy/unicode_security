@@ -2,13 +2,13 @@ defmodule UnicodeSecurity.ComparisonOptions do
   @moduledoc false
 
   @type mode :: :optional | :required
-  @type input_type :: :username | :tenant_slug | :organization_name
+  @type input_type :: :username | :tenant_slug | :organization_name | :domain
 
   @spec resolve!(term(), mode()) :: input_type() | nil
   def resolve!([], :optional), do: nil
 
   def resolve!([type: type], mode)
-      when type in [:username, :tenant_slug, :organization_name] and
+      when type in [:username, :tenant_slug, :organization_name, :domain] and
              mode in [:optional, :required],
       do: type
 

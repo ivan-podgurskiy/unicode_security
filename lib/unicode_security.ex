@@ -184,11 +184,14 @@ defmodule UnicodeSecurity do
   @doc """
   Returns comparison facts and original-input mapping evidence for two identifiers.
 
-  Accepts optional `type: :username`, `:tenant_slug`, or `:organization_name`.
+  Accepts optional `type: :username`, `:tenant_slug`, `:organization_name`, or
+  `:domain`. Domain comparison applies IDNA hostname processing to each label
+  and ignores one optional final root for key equality. Its evidence records
+  cover whole original labels and separators, including removed source text.
   Both inputs are validated left to right. Matching keys are comparison facts,
   not identity or authorization decisions. `mappings` has one entry per original
-  scalar, including removed controls; byte offsets and scalar indexes refer to
-  original input, while `skeleton_spans` use output scalar coordinates.
+  scalar for generic types, including removed controls. Byte offsets and scalar
+  indexes refer to original input; `skeleton_spans` use output scalar coordinates.
   `:all` denotes wholly neutral resolved scripts, and `[]` a mixed intersection.
   """
   @spec compare(binary(), binary(), term()) :: UnicodeSecurity.Comparison.t()
@@ -197,10 +200,13 @@ defmodule UnicodeSecurity do
   @doc """
   Returns the pinned skeleton key for a required identifier type.
 
-  Requires exactly `type: :username`, `:tenant_slug`, or `:organization_name`.
+  Requires exactly `type: :username`, `:tenant_slug`, `:organization_name`, or
+  `:domain`. The domain key uses validated IDNA labels and escaped skeleton
+  payloads, with one optional final root ignored.
   Policy and script overrides are not accepted. The original UTF-8 input is
   validated with the 4,096-byte limit; there is no case folding, trimming, or
-  policy check. Persist the original input and Unicode version alongside any
+  policy check for generic types. Domain names must pass hostname validation.
+  Persist the original input and Unicode version alongside any
   application-owned key index, and recompute versioned keys on data upgrades.
   The key alone does not decide identity or authorization.
   """

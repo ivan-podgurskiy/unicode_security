@@ -61,7 +61,7 @@ defmodule UnicodeSecurity.PairTest do
   end
 
   test "comparison validates options before malformed content and inputs left to right" do
-    for options <- [nil, [type: :domain], [policy: :default], [type: :username, type: :username]] do
+    for options <- [nil, [type: :unknown], [policy: :default], [type: :username, type: :username]] do
       assert_raise ArgumentError, fn -> UnicodeSecurity.compare(<<255>>, <<255>>, options) end
     end
 
@@ -189,7 +189,7 @@ defmodule UnicodeSecurity.PairTest do
   test "optional type options reject invalid values without normalization" do
     assert ComparisonOptions.resolve!([], :optional) == nil
 
-    for type <- [:username, :tenant_slug, :organization_name] do
+    for type <- [:username, :tenant_slug, :organization_name, :domain] do
       assert ComparisonOptions.resolve!([type: type], :optional) == type
       assert ComparisonOptions.resolve!([type: type], :required) == type
     end
@@ -197,7 +197,7 @@ defmodule UnicodeSecurity.PairTest do
     for options <- [
           nil,
           [type: nil],
-          [type: :domain],
+          [type: :domain, policy: :default],
           [type: :username, type: :username],
           [policy: :default],
           [allowed_scripts: [:latin]],

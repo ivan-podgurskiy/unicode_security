@@ -77,7 +77,6 @@ defmodule UnicodeSecurity.ConflictsTest do
       nil,
       [],
       [type: nil],
-      [type: :domain],
       [type: :unknown],
       [type: :username, type: :username],
       [policy: :default],

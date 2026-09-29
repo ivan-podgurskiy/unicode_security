@@ -5,6 +5,7 @@ defmodule UnicodeSecurity.Pair do
     Comparison,
     ComparisonOptions,
     Confusables,
+    Domain,
     Normalization,
     Scripts,
     SkeletonTrace,
@@ -58,7 +59,22 @@ defmodule UnicodeSecurity.Pair do
 
   @spec compare(binary(), binary(), term()) :: Comparison.t()
   def compare(left, right, options \\ []) do
-    ComparisonOptions.resolve!(options, :optional)
+    type = ComparisonOptions.resolve!(options, :optional)
+    compare_by_type(left, right, type)
+  end
+
+  defp compare_by_type(left, right, :domain) do
+    left_validated = Domain.validate!(left)
+    right_validated = Domain.validate!(right)
+    left_facts = Domain.prepare(left_validated, Domain.key(left_validated))
+    right_facts = Domain.prepare(right_validated, Domain.key(right_validated))
+    comparison = Domain.Comparison.compare_prepared(left_facts, right_facts)
+    {_left_key, left_mappings} = Domain.Comparison.trace(left_facts, :left)
+    {_right_key, right_mappings} = Domain.Comparison.trace(right_facts, :right)
+    %{comparison | mappings: left_mappings ++ right_mappings}
+  end
+
+  defp compare_by_type(left, right, _type) do
     left_facts = prepare(left)
     right_facts = prepare(right)
     comparison = compare_prepared(left_facts, right_facts)

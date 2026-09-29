@@ -3,8 +3,9 @@ defmodule UnicodeSecurity.Conflict do
   One existing identifier whose pinned skeleton equals the candidate's key.
 
   `index` is the zero-based position in the supplied enumerable. `code` distinguishes
-  exact original bytes, canonically equivalent skeleton collisions, and the three
-  confusable classes. `comparison` retains original-input facts and both sides'
+  exact original bytes, nonconfusable skeleton collisions (including IDNA-equivalent
+  domain spellings), and the three confusable classes. `comparison` retains
+  original-input facts and both sides'
   mapping evidence. A conflict is advisory; it does not establish ownership,
   impersonation, identifier validity, or an authorization decision.
   """
