@@ -8,6 +8,7 @@ defmodule UnicodeSecurity.Batch.Groups do
 
   alias UnicodeSecurity.Batch.Classes
   alias UnicodeSecurity.{BatchItem, BatchResult, Collision, Duplicate, Pair, Policy, Reason, Utf8}
+  alias UnicodeSecurity.Domain.Classes, as: DomainClasses
 
   @type state :: %{
           results_rev: [BatchItem.t()],
@@ -66,20 +67,25 @@ defmodule UnicodeSecurity.Batch.Groups do
       seen? = Map.has_key?(state.by_key, key)
 
       bucket =
-        Map.get(state.by_key, key, %{members_rev: [], originals: MapSet.new(), signatures: %{}})
+        Map.get(state.by_key, key, %{
+          members_rev: [],
+          originals: MapSet.new(),
+          signatures: %{},
+          domain?: result.type == :domain
+        })
 
       signatures =
         if MapSet.member?(bucket.originals, input) do
           bucket.signatures
         else
-          facts = input |> Utf8.decode!() |> Pair.from_decoded(key)
-          Classes.add(bucket.signatures, facts.resolved, facts.nfd)
+          add_signature(bucket, input, result, key)
         end
 
       bucket = %{
         members_rev: [{index, input} | bucket.members_rev],
         originals: MapSet.put(bucket.originals, input),
-        signatures: signatures
+        signatures: signatures,
+        domain?: bucket.domain?
       }
 
       %{
@@ -90,6 +96,18 @@ defmodule UnicodeSecurity.Batch.Groups do
     else
       state
     end
+  end
+
+  defp add_signature(%{domain?: true, signatures: signatures}, _input, result, _key) do
+    labels = Enum.reject(result.domain.labels, & &1.root?)
+    signature = Enum.map(labels, & &1.resolved_scripts)
+    canonical = Enum.map(labels, & &1.unicode)
+    DomainClasses.add(signatures, signature, canonical)
+  end
+
+  defp add_signature(%{signatures: signatures}, input, _result, key) do
+    facts = input |> Utf8.decode!() |> Pair.from_decoded(key)
+    Classes.add(signatures, facts.resolved, facts.nfd)
   end
 
   defp finish_duplicates(state, policy) do
@@ -122,7 +140,12 @@ defmodule UnicodeSecurity.Batch.Groups do
       if MapSet.size(bucket.originals) >= 2 do
         members = Enum.reverse(bucket.members_rev)
         {indexes, inputs} = Enum.unzip(members)
-        classes = Classes.finish(bucket.signatures)
+
+        classes =
+          if bucket.domain?,
+            do: DomainClasses.finish(bucket.signatures),
+            else: Classes.finish(bucket.signatures)
+
         codes = Enum.sort([:skeleton_collision | classes])
 
         [

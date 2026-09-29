@@ -3,8 +3,10 @@ defmodule UnicodeSecurity.Collision do
   Ordered valid binary inputs sharing one computed skeleton key.
 
   A collision requires at least two distinct exact binary inputs. Its class is
-  the highest-precedence confusable class found across canonically distinct
-  inputs, or `:none` when the distinct inputs are canonically equivalent.
+  the highest-precedence primary confusable class realized by a pair of
+  canonically distinct inputs, or `:none` when distinct inputs share only a
+  canonical form. Domain classes use changed Unicode labels and the strongest
+  changed-label class of each pair.
   """
 
   alias UnicodeSecurity.Reason
