@@ -2,6 +2,12 @@ defmodule UnicodeSecurity.IdnaTest do
   use ExUnit.Case, async: true
 
   alias UnicodeSecurity.Idna
+  alias UnicodeSecurity.Idna.LabelRules
+
+  test "label rules handle empty input and reject embedded separators" do
+    assert LabelRules.issues([]) == []
+    assert {:domain_idna_disallowed, 0, :label_separator} in LabelRules.issues([?.])
+  end
 
   test "nontransitional mapping and equivalent A-labels" do
     assert Idna.to_unicode(String.to_charlist("BÜCHER。example")) ==

@@ -1,7 +1,9 @@
 defmodule UnicodeSecurity.DomainTest do
   use ExUnit.Case, async: true
 
-  alias UnicodeSecurity.{Domain, InvalidDomainError}
+  alias UnicodeSecurity.Domain
+  alias UnicodeSecurity.Domain.Reasons
+  alias UnicodeSecurity.InvalidDomainError
 
   test "normalizes names while retaining original label and root source" do
     result = UnicodeSecurity.check("BÜCHER。a.\u00AD", type: :domain)
@@ -163,7 +165,7 @@ defmodule UnicodeSecurity.DomainTest do
   test "primitive selects the first original-position validity reason" do
     input = "a..xn--abc-"
     result = UnicodeSecurity.check(input, type: :domain, policy: :permissive)
-    first = Enum.find(result.reasons, &UnicodeSecurity.Domain.Reasons.validity?/1)
+    first = Enum.find(result.reasons, &Reasons.validity?/1)
 
     assert {first.code, first.byte_offset, first.details.label_index} ==
              {:domain_empty_label, 2, 1}
@@ -183,6 +185,21 @@ defmodule UnicodeSecurity.DomainTest do
     assert finding.details.source_scope == :label
     assert finding.details.label == "\u00ADxn--abc-"
     assert Enum.at(result.domain.labels, 1).skeleton == "good"
+  end
+
+  test "valid A-label security findings retain label-scope source offset" do
+    result = UnicodeSecurity.check("xn--jea", type: :domain)
+    assert result.valid_input?
+    assert result.domain.unicode == "ĕ"
+
+    assert [
+             %{
+               code: :restricted_character,
+               byte_offset: 0,
+               codepoint_index: 0,
+               details: %{source_scope: :label, codepoint: 0x0115}
+             }
+           ] = result.reasons
   end
 
   test "deviation codepoint names the mapped scalar at original position" do

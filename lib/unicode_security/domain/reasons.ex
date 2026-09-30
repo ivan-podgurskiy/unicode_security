@@ -67,10 +67,10 @@ defmodule UnicodeSecurity.Domain.Reasons do
 
   defp position(%{origin: nil}, _unit, _decoded), do: {nil, nil}
 
-  defp position(%{origin: origin}, unit, decoded) do
-    case Enum.at(decoded, origin) do
-      {_scalar, offset} -> {offset, origin}
-      nil -> {if(unit, do: unit.byte_offset + unit.byte_length, else: nil), origin}
-    end
+  defp position(%{origin: origin}, _unit, decoded) do
+    # Scalar origins are copied from decoded source tags; empty/end positions
+    # are reported with label scope or nil origin before reaching this clause.
+    {_scalar, offset} = Enum.at(decoded, origin)
+    {offset, origin}
   end
 end

@@ -16,31 +16,32 @@ defmodule UnicodeSecurity.Idna.Punycode do
   def encode(scalars, maximum_bytes)
       when is_list(scalars) and is_integer(maximum_bytes) and maximum_bytes >= 0 do
     if Enum.all?(scalars, &scalar?/1) do
-      basics = Enum.filter(scalars, &(&1 < 128))
-      basic_count = length(basics)
-      total = length(scalars)
-      initial_size = basic_count + if(basic_count > 0, do: 1, else: 0)
-
-      if initial_size > maximum_bytes do
-        {:error, :output_too_long}
-      else
-        output = if basic_count > 0, do: [?- | Enum.reverse(basics)], else: []
-
-        encode_loop(
-          scalars,
-          total,
-          basic_count,
-          basic_count,
-          @initial_n,
-          0,
-          @initial_bias,
-          output,
-          initial_size,
-          maximum_bytes
-        )
-      end
+      encode_valid(scalars, maximum_bytes)
     else
       {:error, :invalid_scalar}
+    end
+  end
+
+  defp encode_valid(scalars, maximum_bytes) do
+    basics = Enum.filter(scalars, &(&1 < 128))
+    basic_count = length(basics)
+    initial_size = basic_count + if(basic_count > 0, do: 1, else: 0)
+
+    if initial_size > maximum_bytes do
+      {:error, :output_too_long}
+    else
+      state = %{
+        h: basic_count,
+        basic_count: basic_count,
+        n: @initial_n,
+        delta: 0,
+        bias: @initial_bias,
+        output: if(basic_count > 0, do: [?- | Enum.reverse(basics)], else: []),
+        size: initial_size,
+        limit: maximum_bytes
+      }
+
+      encode_loop(scalars, length(scalars), state)
     end
   end
 
@@ -55,93 +56,92 @@ defmodule UnicodeSecurity.Idna.Punycode do
 
       matches ->
         {delimiter, 1} = List.last(matches)
-
-        if delimiter == 0 do
-          {:error, :invalid_encoding}
-        else
-          prefix = binary_part(body, 0, delimiter)
-          encoded = binary_part(body, delimiter + 1, byte_size(body) - delimiter - 1)
-
-          cond do
-            not ascii?(prefix) ->
-              {:error, :invalid_encoding}
-
-            delimiter > maximum_scalars ->
-              {:error, :output_too_long}
-
-            true ->
-              decode_loop(
-                encoded,
-                :binary.bin_to_list(prefix),
-                delimiter,
-                @initial_n,
-                0,
-                @initial_bias,
-                maximum_scalars
-              )
-          end
-        end
+        decode_delimited(body, delimiter, maximum_scalars)
     end
   end
 
-  defp encode_loop(
-         _scalars,
-         total,
-         total,
-         _basic_count,
-         _n,
-         _delta,
-         _bias,
-         output,
-         _size,
-         _limit
-       ),
-       do: {:ok, output |> Enum.reverse() |> :erlang.list_to_binary()}
+  defp decode_delimited(_body, 0, _maximum_scalars), do: {:error, :invalid_encoding}
 
-  defp encode_loop(scalars, total, h, basic_count, n, delta, bias, output, size, limit) do
+  defp decode_delimited(body, delimiter, maximum_scalars) do
+    prefix = binary_part(body, 0, delimiter)
+    encoded = binary_part(body, delimiter + 1, byte_size(body) - delimiter - 1)
+
+    cond do
+      not ascii?(prefix) ->
+        {:error, :invalid_encoding}
+
+      delimiter > maximum_scalars ->
+        {:error, :output_too_long}
+
+      true ->
+        decode_loop(
+          encoded,
+          :binary.bin_to_list(prefix),
+          delimiter,
+          @initial_n,
+          0,
+          @initial_bias,
+          maximum_scalars
+        )
+    end
+  end
+
+  defp encode_loop(_scalars, total, %{h: h, output: output}) when h == total,
+    do: {:ok, output |> Enum.reverse() |> :erlang.list_to_binary()}
+
+  defp encode_loop(scalars, total, state) do
+    %{h: h, n: n, delta: delta} = state
+
     m =
       Enum.reduce(scalars, @max_scalar, fn cp, acc ->
         if cp >= n and cp < acc, do: cp, else: acc
       end)
 
-    bound = (@max_scalar - n) * (total + 1) + total
+    # After each emitted scalar, at most `total` lower scalars remain to be
+    # scanned; the following loop starts with that remainder plus one. A new
+    # scan may add another `total` before the next emission. The former bound
+    # allowed only one scan and falsely rejected valid high-scalar sequences.
+    bound = (@max_scalar - n) * (total + 1) + 2 * total + 1
     distance = m - n
 
     if distance > div(bound - delta, h + 1) do
       {:error, :overflow}
     else
-      delta = delta + distance * (h + 1)
+      state = %{state | delta: delta + distance * (h + 1)}
 
-      with {:ok, delta, h, bias, output, size} <-
-             encode_matching(scalars, m, delta, h, basic_count, bias, output, size, limit, bound) do
-        encode_loop(scalars, total, h, basic_count, m + 1, delta + 1, bias, output, size, limit)
+      with {:ok, state} <- encode_matching(scalars, m, state, bound) do
+        encode_loop(scalars, total, %{state | n: m + 1, delta: state.delta + 1})
       end
     end
   end
 
-  defp encode_matching([], _n, delta, h, _basic_count, bias, output, size, _limit, _bound),
-    do: {:ok, delta, h, bias, output, size}
+  defp encode_matching([], _n, state, _bound), do: {:ok, state}
 
-  defp encode_matching([cp | rest], n, delta, h, basic_count, bias, output, size, limit, bound) do
+  defp encode_matching([cp | rest], n, state, bound) do
     cond do
-      cp < n and delta >= bound ->
+      cp < n and state.delta >= bound ->
         {:error, :overflow}
 
       cp < n ->
-        encode_matching(rest, n, delta + 1, h, basic_count, bias, output, size, limit, bound)
+        encode_matching(rest, n, %{state | delta: state.delta + 1}, bound)
 
       cp == n ->
-        case emit(delta, bias, output, size, limit, @base) do
-          {:ok, output, size} ->
-            next_bias = adapt(delta, h + 1, h == basic_count)
-            encode_matching(rest, n, 0, h + 1, basic_count, next_bias, output, size, limit, bound)
-
-          error ->
-            error
-        end
+        encode_equal(rest, n, state, bound)
 
       true ->
-        encode_matching(rest, n, delta, h, basic_count, bias, output, size, limit, bound)
+        encode_matching(rest, n, state, bound)
+    end
+  end
+
+  defp encode_equal(rest, n, state, bound) do
+    case emit(state.delta, state.bias, state.output, state.size, state.limit, @base) do
+      {:ok, output, size} ->
+        next_bias = adapt(state.delta, state.h + 1, state.h == state.basic_count)
+        next = %{state | delta: 0, h: state.h + 1, bias: next_bias, output: output, size: size}
+        encode_matching(rest, n, next, bound)
+
+      error ->
+        error
     end
   end
 
@@ -200,37 +200,43 @@ defmodule UnicodeSecurity.Idna.Punycode do
         {:error, :invalid_encoding}
 
       digit ->
-        t = threshold(k, bias)
-
-        cond do
-          weight > remaining and digit > 0 ->
-            {:error, :overflow}
-
-          weight <= remaining and digit > div(remaining, weight) ->
-            {:error, :overflow}
-
-          digit == 0 ->
-            {:ok, value, rest}
-
-          digit < t ->
-            {:ok, value + digit * weight, rest}
-
-          true ->
-            term = digit * weight
-            next_remaining = remaining - term
-            multiplier = @base - t
-
-            next_weight =
-              if weight > div(next_remaining, multiplier),
-                do: next_remaining + 1,
-                else: weight * multiplier
-
-            read_integer(rest, bias, next_remaining, value + term, next_weight, k + @base)
-        end
+        consume_digit(digit, rest, bias, remaining, value, weight, k)
     end
   end
 
-  defp check_decoded_scalar(cp) when cp > @max_scalar, do: {:error, :overflow}
+  defp consume_digit(digit, rest, bias, remaining, value, weight, k) do
+    t = threshold(k, bias)
+
+    cond do
+      weight > remaining and digit > 0 ->
+        {:error, :overflow}
+
+      weight <= remaining and digit > div(remaining, weight) ->
+        {:error, :overflow}
+
+      digit == 0 ->
+        {:ok, value, rest}
+
+      digit < t ->
+        {:ok, value + digit * weight, rest}
+
+      true ->
+        continue_integer(digit, rest, bias, remaining, value, weight, k, t)
+    end
+  end
+
+  defp continue_integer(digit, rest, bias, remaining, value, weight, k, t) do
+    term = digit * weight
+    next_remaining = remaining - term
+    multiplier = @base - t
+
+    next_weight =
+      if weight > div(next_remaining, multiplier),
+        do: next_remaining + 1,
+        else: weight * multiplier
+
+    read_integer(rest, bias, next_remaining, value + term, next_weight, k + @base)
+  end
 
   defp check_decoded_scalar(cp) when cp >= 0xD800 and cp <= 0xDFFF,
     do: {:error, :invalid_scalar}

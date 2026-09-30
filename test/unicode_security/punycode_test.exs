@@ -61,6 +61,31 @@ defmodule UnicodeSecurity.Idna.PunycodeTest do
     assert Punycode.decode(ascii, 202) == {:ok, scalars}
   end
 
+  test "carries the post-emission scan remainder before the maximum scalar" do
+    scalars = [0x10FFFE] ++ List.duplicate(?a, 200) ++ [0x10FFFF]
+    # Independent Python RFC 3492 codec result; the valid body is 211 bytes.
+    ascii = String.duplicate("a", 200) <> "-r87983prla"
+
+    assert byte_size(ascii) == 211
+    assert Punycode.encode(scalars, 1024) == {:ok, ascii}
+    assert Punycode.decode(ascii, 202) == {:ok, scalars}
+  end
+
+  test "carries high-scalar remainders across positions and repetitions" do
+    basics = List.duplicate(?a, 200)
+    prefix = String.duplicate("a", 200)
+
+    for {scalars, suffix} <- [
+          {[0x10FFFF] ++ basics ++ [0x10FFFE], "-hf8983pba"},
+          {[0x10FFFE, 0x10FFFF] ++ basics, "-r87983p1fa"},
+          {[0x10FFFE] ++ basics ++ [0x10FFFF, 0x10FFFE, 0x10FFFF], "-r87983pzfauhb"}
+        ] do
+      ascii = prefix <> suffix
+      assert Punycode.encode(scalars, 1024) == {:ok, ascii}
+      assert Punycode.decode(ascii, length(scalars)) == {:ok, scalars}
+    end
+  end
+
   test "rejects non-scalars at either interface" do
     for scalar <- [-1, 0xD800, 0xDFFF, 0x110000] do
       assert Punycode.encode([scalar], 59) == {:error, :invalid_scalar}

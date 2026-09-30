@@ -92,23 +92,29 @@ defmodule UnicodeSecurity.Test.IdnaFixtures do
         []
 
       <<"[", body::binary>> ->
-        if String.ends_with?(body, "]") do
-          body
-          |> binary_part(0, byte_size(body) - 1)
-          |> String.split(",")
-          |> Enum.map(&trim_ascii/1)
-          |> Enum.map(fn status ->
-            if Regex.match?(~r/^[A-Z][0-9]+(?:_[0-9]+)?$/, status),
-              do: status,
-              else: invalid!(number, "malformed status")
-          end)
-        else
-          invalid!(number, "malformed status")
-        end
+        parse_status_list!(body, number)
 
       _ ->
         invalid!(number, "malformed status")
     end
+  end
+
+  defp parse_status_list!(body, number) do
+    if String.ends_with?(body, "]") do
+      body
+      |> binary_part(0, byte_size(body) - 1)
+      |> String.split(",")
+      |> Enum.map(&trim_ascii/1)
+      |> Enum.map(&parse_status_atom!(&1, number))
+    else
+      invalid!(number, "malformed status")
+    end
+  end
+
+  defp parse_status_atom!(status, number) do
+    if Regex.match?(~r/^[A-Z][0-9]+(?:_[0-9]+)?$/, status),
+      do: status,
+      else: invalid!(number, "malformed status")
   end
 
   defp trim_ascii(value), do: Regex.replace(~r/^[ \t]+|[ \t]+$/, value, "")

@@ -43,6 +43,12 @@ defmodule UnicodeSecurity.IdnaParserTest do
     end
   end
 
+  test "rejects malformed IDNA range syntax before evaluating bounds" do
+    assert_raise ArgumentError, ~r/invalid IDNA range/, fn ->
+      IdnaParser.parse!("00GG..10FFFF ; valid\n")
+    end
+  end
+
   test "rejects unsorted, overlapping, and incomplete ranges" do
     for text <- [
           "0001..10FFFF ; valid\n0000 ; valid\n",

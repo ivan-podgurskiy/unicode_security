@@ -60,35 +60,9 @@ defmodule UnicodeSecurity.Idna do
     last_index = length(segments) - 1
     trailing_dot? = last_index > 0 and elem(List.last(segments), 0) == []
 
-    labels =
-      segments
-      |> Enum.with_index()
-      |> Enum.map(fn {{tagged, fallback}, index} ->
-        process_label(tagged, fallback, index, index == last_index and trailing_dot?, mode)
-      end)
-
-    bidi_issues =
-      labels
-      |> Enum.map(fn label -> if label.root?, do: nil, else: label.unicode end)
-      |> Bidi.invalid_indexes()
-      |> Enum.map(fn {label_index, local, rule} ->
-        label = Enum.at(labels, label_index)
-
-        details =
-          if is_integer(local) and is_list(label.unicode),
-            do: %{rule: rule, codepoint: Enum.at(label.unicode, local)},
-            else: %{rule: rule}
-
-        scope = if(is_nil(local), do: :label, else: label_scope(label))
-        issue(:domain_bidi_rule, label_index, label_origin(label, local), scope, details)
-      end)
-
-    labels =
-      Enum.map(labels, fn label ->
-        extra = Enum.filter(bidi_issues, &(&1.label_index == label.index))
-        issues = Enum.uniq(label.issues ++ extra)
-        %{label | issues: issues, valid?: Enum.all?(issues, &advisory?/1)}
-      end)
+    labels = build_labels(segments, last_index, trailing_dot?, mode)
+    bidi_issues = bidi_issues(labels)
+    labels = attach_bidi_issues(labels, bidi_issues)
 
     length_issues = if ascii_mode?(mode), do: name_length_issues(labels, trailing_dot?), else: []
     issues = Enum.uniq(Enum.flat_map(labels, & &1.issues) ++ length_issues)
@@ -103,7 +77,7 @@ defmodule UnicodeSecurity.Idna do
 
     ascii =
       if valid? and ascii_mode?(mode) do
-        labels |> Enum.map(& &1.ascii) |> Enum.join(".")
+        Enum.map_join(labels, ".", & &1.ascii)
       else
         nil
       end
@@ -116,6 +90,39 @@ defmodule UnicodeSecurity.Idna do
       valid?: valid?,
       issues: issues
     }
+  end
+
+  defp build_labels(segments, last_index, trailing_dot?, mode) do
+    segments
+    |> Enum.with_index()
+    |> Enum.map(fn {{tagged, fallback}, index} ->
+      process_label(tagged, fallback, index, index == last_index and trailing_dot?, mode)
+    end)
+  end
+
+  defp bidi_issues(labels) do
+    labels
+    |> Enum.map(fn label -> if label.root?, do: nil, else: label.unicode end)
+    |> Bidi.invalid_indexes()
+    |> Enum.map(fn {label_index, local, rule} ->
+      label = Enum.at(labels, label_index)
+
+      details =
+        if is_integer(local) and is_list(label.unicode),
+          do: %{rule: rule, codepoint: Enum.at(label.unicode, local)},
+          else: %{rule: rule}
+
+      scope = if(is_nil(local), do: :label, else: label_scope(label))
+      issue(:domain_bidi_rule, label_index, label_origin(label, local), scope, details)
+    end)
+  end
+
+  defp attach_bidi_issues(labels, bidi_issues) do
+    Enum.map(labels, fn label ->
+      extra = Enum.filter(bidi_issues, &(&1.label_index == label.index))
+      issues = Enum.uniq(label.issues ++ extra)
+      %{label | issues: issues, valid?: Enum.all?(issues, &advisory?/1)}
+    end)
   end
 
   defp validity_issues(report), do: Enum.reject(report.issues, &advisory?/1)
@@ -234,40 +241,40 @@ defmodule UnicodeSecurity.Idna do
 
       true ->
         body_binary = :erlang.list_to_binary(body)
+        decode_alabel(body_binary, fallback, index, origin, mode)
+    end
+  end
 
-        case Punycode.decode(body_binary, byte_size(body_binary)) do
-          {:ok, []} ->
-            failed_alabel(index, origin, :empty_decode)
+  defp decode_alabel(body, fallback, index, origin, mode) do
+    case Punycode.decode(body, byte_size(body)) do
+      {:ok, []} -> failed_alabel(index, origin, :empty_decode)
+      {:ok, decoded} -> process_decoded_alabel(decoded, body, fallback, index, origin, mode)
+      {:error, _} -> failed_alabel(index, origin, :punycode)
+    end
+  end
 
-          {:ok, decoded} ->
-            if Enum.all?(decoded, &(&1 < 128)) do
-              failed_alabel(index, origin, :ascii_decode)
-            else
-              decoded_tagged = Enum.map(decoded, &{&1, origin})
-              label = process_unicode_label(decoded_tagged, fallback, index, mode, true)
-              canonical = Punycode.encode(decoded, byte_size(body_binary))
+  defp process_decoded_alabel(decoded, body, fallback, index, origin, mode) do
+    if Enum.all?(decoded, &(&1 < 128)) do
+      failed_alabel(index, origin, :ascii_decode)
+    else
+      decoded_tagged = Enum.map(decoded, &{&1, origin})
+      label = process_unicode_label(decoded_tagged, fallback, index, mode, true)
+      canonical = Punycode.encode(decoded, byte_size(body))
 
-              roundtrip =
-                if canonical == {:ok, body_binary},
-                  do: [],
-                  else: [
-                    issue(:domain_invalid_alabel, index, origin, :label, %{rule: :roundtrip})
-                  ]
+      roundtrip =
+        if canonical == {:ok, body},
+          do: [],
+          else: [issue(:domain_invalid_alabel, index, origin, :label, %{rule: :roundtrip})]
 
-              issues = Enum.uniq(label.issues ++ roundtrip)
+      issues = Enum.uniq(label.issues ++ roundtrip)
 
-              %{
-                label
-                | alabel?: true,
-                  ascii: if(ascii_mode?(mode), do: "xn--" <> body_binary, else: nil),
-                  valid?: Enum.all?(issues, &advisory?/1),
-                  issues: issues
-              }
-            end
-
-          {:error, _} ->
-            failed_alabel(index, origin, :punycode)
-        end
+      %{
+        label
+        | alabel?: true,
+          ascii: if(ascii_mode?(mode), do: "xn--" <> body, else: nil),
+          valid?: Enum.all?(issues, &advisory?/1),
+          issues: issues
+      }
     end
   end
 
@@ -355,39 +362,44 @@ defmodule UnicodeSecurity.Idna do
 
   defp encode_label(scalars, index, origin, false) do
     if Enum.all?(scalars, &(&1 < 128)) do
-      ascii = :erlang.list_to_binary(scalars)
-
-      if byte_size(ascii) <= 63,
-        do: {ascii, []},
-        else:
-          {nil,
-           [
-             issue(:domain_label_too_long, index, origin, :label, %{
-               actual_bytes: byte_size(ascii),
-               maximum_bytes: 63
-             })
-           ]}
+      ascii_label(scalars, index, origin)
     else
-      if length(scalars) > 63 do
-        {nil, [issue(:domain_label_too_long, index, origin, :label, %{maximum_bytes: 63})]}
-      else
-        case Punycode.encode(scalars, 59) do
-          {:ok, body} ->
-            {"xn--" <> body, []}
+      punycode_label(scalars, index, origin)
+    end
+  end
 
-          {:error, :output_too_long} ->
-            {nil, [issue(:domain_label_too_long, index, origin, :label, %{maximum_bytes: 63})]}
+  defp ascii_label(scalars, index, origin) do
+    ascii = :erlang.list_to_binary(scalars)
 
-          {:error, _} ->
-            {nil, [issue(:domain_idna_disallowed, index, origin, :label, %{rule: :status})]}
-        end
+    if byte_size(ascii) <= 63,
+      do: {ascii, []},
+      else:
+        {nil,
+         [
+           issue(:domain_label_too_long, index, origin, :label, %{
+             actual_bytes: byte_size(ascii),
+             maximum_bytes: 63
+           })
+         ]}
+  end
+
+  defp punycode_label(scalars, index, origin) do
+    if length(scalars) > 63 do
+      {nil, [issue(:domain_label_too_long, index, origin, :label, %{maximum_bytes: 63})]}
+    else
+      case Punycode.encode(scalars, 59) do
+        {:ok, body} ->
+          {"xn--" <> body, []}
+
+        {:error, :output_too_long} ->
+          {nil, [issue(:domain_label_too_long, index, origin, :label, %{maximum_bytes: 63})]}
       end
     end
   end
 
   defp name_length_issues(labels, trailing_dot?) do
     if Enum.all?(labels, &is_binary(&1.ascii)) do
-      name = labels |> Enum.map(& &1.ascii) |> Enum.join(".")
+      name = Enum.map_join(labels, ".", & &1.ascii)
       length = byte_size(name) - if(trailing_dot?, do: 1, else: 0)
 
       if length in 1..253 do
@@ -410,18 +422,16 @@ defmodule UnicodeSecurity.Idna do
   defp local_origin(tagged, nil, fallback),
     do: if(tagged == [], do: fallback, else: elem(hd(tagged), 1))
 
-  defp local_origin(tagged, local, fallback) do
-    case Enum.at(tagged, local) do
-      nil -> fallback
-      {_scalar, origin} -> origin
-    end
+  defp local_origin(tagged, local, _fallback) do
+    # Indexed findings come from this label's tagged Unicode sequence.
+    {_scalar, origin} = Enum.at(tagged, local)
+    origin
   end
 
   defp label_origin(label, nil), do: local_origin(label.tagged || [], nil, 0)
   defp label_origin(label, local), do: local_origin(label.tagged || [], local, 0)
   defp label_scope(label), do: if(label.alabel?, do: :label, else: :scalar)
   defp scope(true, _local), do: :label
-  defp scope(false, nil), do: :label
   defp scope(false, _local), do: :scalar
 
   defp issue(code, label_index, origin, source_scope, details) do

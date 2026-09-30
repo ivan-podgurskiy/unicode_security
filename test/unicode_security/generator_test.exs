@@ -4,8 +4,8 @@ defmodule UnicodeSecurity.GeneratorTest do
   alias UnicodeSecurity.Data.Normalization
   alias UnicodeSecurity.Test.ElixirRunner
   alias UnicodeSecurity.UnicodeData.Generator
-  alias UnicodeSecurity.UnicodeData.IdnaGenerator
   alias UnicodeSecurity.UnicodeData.IdentifierGenerator
+  alias UnicodeSecurity.UnicodeData.IdnaGenerator
   alias UnicodeSecurity.UnicodeData.Source
 
   test "reproduces IDNA data deterministically and validates all sources before writing" do

@@ -1,9 +1,20 @@
 defmodule UnicodeSecurity.Domain do
   @moduledoc false
 
-  alias UnicodeSecurity.{Check, Confusables, DomainLabel, DomainResult, Idna}
-  alias UnicodeSecurity.{InvalidDomainError, Normalization, Policy, Result, Scripts, Utf8}
-  alias UnicodeSecurity.Domain.{Key, Reasons, Source}
+  alias UnicodeSecurity.Check
+  alias UnicodeSecurity.Confusables
+  alias UnicodeSecurity.Domain.Key
+  alias UnicodeSecurity.Domain.Reasons
+  alias UnicodeSecurity.Domain.Source
+  alias UnicodeSecurity.DomainLabel
+  alias UnicodeSecurity.DomainResult
+  alias UnicodeSecurity.Idna
+  alias UnicodeSecurity.InvalidDomainError
+  alias UnicodeSecurity.Normalization
+  alias UnicodeSecurity.Policy
+  alias UnicodeSecurity.Result
+  alias UnicodeSecurity.Scripts
+  alias UnicodeSecurity.Utf8
 
   @type validated :: %{
           input: binary(),
@@ -305,8 +316,6 @@ defmodule UnicodeSecurity.Domain do
         end
       end)
   end
-
-  defp weakest([]), do: :ascii
 
   defp weakest([first | rest]) do
     Enum.reduce(rest, first, fn level, weakest ->

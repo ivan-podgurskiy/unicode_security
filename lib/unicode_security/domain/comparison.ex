@@ -47,34 +47,38 @@ defmodule UnicodeSecurity.Domain.Comparison do
 
     {chunks, records, _index} =
       Enum.reduce(facts.units, {[], [], 0}, fn unit, {chunks, records, target_index} ->
-        contribution = contribution(unit, labels, last_index)
-
-        if unit.byte_length == 0 do
-          {chunks, records, target_index}
-        else
-          count = contribution |> String.to_charlist() |> length()
-
-          spans =
-            if count == 0,
-              do: [],
-              else: [%{codepoint_index: target_index, codepoint_count: count}]
-
-          record = %{
-            side: side,
-            byte_offset: unit.byte_offset,
-            byte_length: unit.byte_length,
-            codepoint_index: unit.codepoint_index,
-            codepoint_count: unit.codepoint_count,
-            codepoints: unit.codepoints,
-            skeleton_spans: spans,
-            mapping: contribution
-          }
-
-          {[contribution | chunks], [record | records], target_index + count}
-        end
+        trace_unit(unit, labels, last_index, side, chunks, records, target_index)
       end)
 
     {chunks |> Enum.reverse() |> IO.iodata_to_binary(), Enum.reverse(records)}
+  end
+
+  defp trace_unit(unit, labels, last_index, side, chunks, records, target_index) do
+    contribution = contribution(unit, labels, last_index)
+
+    if unit.byte_length == 0 do
+      {chunks, records, target_index}
+    else
+      count = contribution |> String.to_charlist() |> length()
+
+      spans =
+        if count == 0,
+          do: [],
+          else: [%{codepoint_index: target_index, codepoint_count: count}]
+
+      record = %{
+        side: side,
+        byte_offset: unit.byte_offset,
+        byte_length: unit.byte_length,
+        codepoint_index: unit.codepoint_index,
+        codepoint_count: unit.codepoint_count,
+        codepoints: unit.codepoints,
+        skeleton_spans: spans,
+        mapping: contribution
+      }
+
+      {[contribution | chunks], [record | records], target_index + count}
+    end
   end
 
   defp contribution(%{kind: :label, label_index: index}, labels, last_index)

@@ -23,4 +23,17 @@ defmodule UnicodeSecurity.IdnaFixturesTest do
     assert_raise ArgumentError, ~r/line 2/, fn -> IdnaFixtures.parse!("# header\na; b") end
     assert_raise ArgumentError, ~r/line 1/, fn -> IdnaFixtures.parse!(~S(\uZZZZ; ; ; ; ; ;)) end
   end
+
+  test "rejects malformed escaped source and status fields with their line" do
+    for row <- [
+          ~S(\x{123; ; ; ; ; ;),
+          ~S(\q; ; ; ; ; ;),
+          <<255>> <> "; ; ; ; ; ;",
+          "a; ; [bad]; ; ; ;",
+          "a; ; [V1; ; ; ;",
+          "a; ; malformed; ; ; ;"
+        ] do
+      assert_raise ArgumentError, ~r/IDNA fixture line 1/, fn -> IdnaFixtures.parse!(row) end
+    end
+  end
 end
