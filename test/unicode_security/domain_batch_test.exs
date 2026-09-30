@@ -40,6 +40,19 @@ defmodule UnicodeSecurity.DomainBatchTest do
     assert collision.class == :mixed_script_confusable
   end
 
+  test "U-label and A-label spellings share a class-none bucket" do
+    inputs = ["bücher.a", "xn--bcher-kva.a"]
+    batch = UnicodeSecurity.check_many(inputs, type: :domain)
+
+    assert [collision] = batch.collisions
+    assert collision.inputs == inputs
+    assert collision.indexes == [0, 1]
+    assert collision.class == :none
+    assert collision.classes == []
+    assert Enum.map(collision.reasons, & &1.code) == [:skeleton_collision]
+    assert Enum.map(batch.results, & &1.result.domain.unicode) == ["bücher.a", "bücher.a"]
+  end
+
   test "domain buckets preserve occurrence and first-key order" do
     inputs = ["a.a", "A.a", "x.x", "а.a", "a.a", "X.x", "a..", "a..", nil]
     batch = UnicodeSecurity.check_many(inputs, type: :domain)
@@ -109,6 +122,12 @@ defmodule UnicodeSecurity.DomainBatchTest do
     end
   end
 
+  test "domain audit validates the Enumerable protocol immediately" do
+    assert_raise ArgumentError, "expected an enumerable", fn ->
+      UnicodeSecurity.audit(123, type: :domain)
+    end
+  end
+
   test "complete batch output matches a direct all-pairs oracle across small permutations" do
     names = [
       "a.a",
@@ -121,6 +140,7 @@ defmodule UnicodeSecurity.DomainBatchTest do
       "Ａ.A.",
       "A.a",
       "bücher.a",
+      "xn--bcher-kva.a",
       "BÜCHER.a",
       "a..",
       nil
