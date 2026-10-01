@@ -63,7 +63,7 @@ defmodule UnicodeSecurity.Normalization do
   defp recompose([], starter, marks, _class, acc), do: Enum.reverse(marks ++ [starter | acc])
 
   defp recompose([value | rest], starter, marks, previous_class, acc) do
-    class = Data.combining_class(scalar_value(value))
+    class = combining_class(scalar_value(value))
 
     composite =
       if starter != nil and (previous_class == 0 or previous_class < class),
@@ -100,6 +100,9 @@ defmodule UnicodeSecurity.Normalization do
 
   defp compose(first, second), do: Composition.compose(first, second)
 
+  # The pinned normalization table has no ASCII decomposition or nonzero CCC.
+  defp decompose(scalar) when scalar <= 0x7F, do: [scalar]
+
   defp decompose(scalar) when scalar >= @s_base and scalar < @s_base + @s_count do
     index = scalar - @s_base
     leading = @l_base + div(index, @n_count)
@@ -121,7 +124,7 @@ defmodule UnicodeSecurity.Normalization do
   defp reorder([], marks, acc), do: Enum.reverse(flush_marks(marks, acc))
 
   defp reorder([value | rest], marks, acc) do
-    case Data.combining_class(scalar_value(value)) do
+    case combining_class(scalar_value(value)) do
       0 -> reorder(rest, [], [value | flush_marks(marks, acc)])
       class -> reorder(rest, [{value, class} | marks], acc)
     end
@@ -129,6 +132,9 @@ defmodule UnicodeSecurity.Normalization do
 
   defp scalar_value({scalar, _origin}), do: scalar
   defp scalar_value(scalar), do: scalar
+
+  defp combining_class(scalar) when scalar <= 0x7F, do: 0
+  defp combining_class(scalar), do: Data.combining_class(scalar)
 
   defp flush_marks(marks, acc) do
     # Restore source order before the stable sort so equal classes keep their order.

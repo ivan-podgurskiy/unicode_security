@@ -1,5 +1,12 @@
 defmodule UnicodeSecurity.DomainLabel do
-  @moduledoc "Original source span, normalized forms, and security facts for one domain label."
+  @moduledoc """
+  Original source span, normalized forms, and security facts for one domain label.
+
+  Offsets and counts refer to the original UTF-8 input. A trailing root may
+  contain source characters removed by UTS #46, so its `input` need not be empty.
+  Each non-root label has its own policy findings. Invalid labels retain only
+  forms known safe to report and leave unavailable security facts `nil`.
+  """
   defstruct [
     :index,
     :input,

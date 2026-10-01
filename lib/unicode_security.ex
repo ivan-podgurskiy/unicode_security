@@ -49,6 +49,8 @@ defmodule UnicodeSecurity do
   retain each original label and optional final root, then analyze normalized
   non-root labels separately. The whole-domain skeleton escapes literal dots
   and percent signs inside label skeletons so they cannot imitate boundaries.
+  Processing is nontransitional with STD3, hyphen, bidi, joiner, and DNS length
+  checks. An optional final root is accepted by the public hostname adapter.
   IDNA or hostname failures keep safe partial label facts but leave whole-name
   Unicode, ASCII, and skeleton values nil. Domain validity is independent of
   the selected security policy.
@@ -74,6 +76,9 @@ defmodule UnicodeSecurity do
 
       iex> UnicodeSecurity.check("", type: :username).verdict
       :dangerous
+
+      iex> UnicodeSecurity.check("https://a", type: :domain).valid_input?
+      false
   """
   @spec check(binary(), keyword()) :: UnicodeSecurity.Result.t()
   defdelegate check(input, options), to: UnicodeSecurity.Check
@@ -193,6 +198,11 @@ defmodule UnicodeSecurity do
   scalar for generic types, including removed controls. Byte offsets and scalar
   indexes refer to original input; `skeleton_spans` use output scalar coordinates.
   `:all` denotes wholly neutral resolved scripts, and `[]` a mixed intersection.
+
+  ## Example
+
+      iex> UnicodeSecurity.compare("a", "A.", type: :domain).class
+      :none
   """
   @spec compare(binary(), binary(), term()) :: UnicodeSecurity.Comparison.t()
   def compare(left, right, options \\ []), do: UnicodeSecurity.Pair.compare(left, right, options)
@@ -209,6 +219,11 @@ defmodule UnicodeSecurity do
   Persist the original input and Unicode version alongside any
   application-owned key index, and recompute versioned keys on data upgrades.
   The key alone does not decide identity or authorization.
+
+  ## Example
+
+      iex> UnicodeSecurity.conflict_key("BÜCHER.a.", type: :domain) == UnicodeSecurity.conflict_key("xn--bcher-kva.a", type: :domain)
+      true
   """
   @spec conflict_key(binary(), term()) :: binary()
   defdelegate conflict_key(input, options), to: UnicodeSecurity.Conflicts

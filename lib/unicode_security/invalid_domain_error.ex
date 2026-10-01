@@ -1,5 +1,11 @@
 defmodule UnicodeSecurity.InvalidDomainError do
-  @moduledoc "Raised when an original UTF-8 input fails domain validity checks."
+  @moduledoc """
+  Raised by domain comparison and key APIs when an original input fails hostname validity.
+
+  `reason` is a stable diagnostic code; the optional original byte offset and
+  zero-based label index identify the selected earliest validity finding. The
+  exception message is static and never incorporates untrusted input.
+  """
   defexception [:reason, :byte_offset, :label_index]
 
   @impl true

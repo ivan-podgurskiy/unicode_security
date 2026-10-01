@@ -5,8 +5,8 @@ defmodule UnicodeSecurity.Conflict do
   `index` is the zero-based position in the supplied enumerable. `code` distinguishes
   exact original bytes, nonconfusable skeleton collisions (including IDNA-equivalent
   domain spellings), and the three confusable classes. `comparison` retains
-  original-input facts and both sides'
-  mapping evidence. A conflict is advisory; it does not establish ownership,
+  original-input facts and mapping evidence for both sides. A conflict is
+  advisory; it does not establish ownership,
   impersonation, identifier validity, or an authorization decision.
   """
 

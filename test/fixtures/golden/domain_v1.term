@@ -1,0 +1,1077 @@
+# Public domain contracts are written as literal expected terms. Never derive them
+# from a production call while updating this file.
+%{version: 1, cases: [
+  {"single ASCII label", :check, ["a", [type: :domain]],
+   %UnicodeSecurity.Result{
+     input: "a", type: :domain, policy: :strict, verdict: :safe,
+     scripts: [:latin], mixed_script?: false, mixed_number?: false,
+     restriction_level: :ascii, skeleton: "a", unicode_version: "18.0.0",
+     valid_input?: true, reasons: [],
+     domain: %UnicodeSecurity.DomainResult{
+       unicode: "a", ascii: "a", trailing_dot?: false, mapped?: false,
+       valid_idna?: true, uts46_revision: 36,
+       labels: [%UnicodeSecurity.DomainLabel{
+         index: 0, input: "a", byte_offset: 0, byte_length: 1,
+         codepoint_index: 0, codepoint_count: 1, root?: false,
+         unicode: "a", ascii: "a", mapped?: false, valid_idna?: true,
+         skeleton: "a", scripts: [:latin], resolved_scripts: [:hntl, :latin],
+         mixed_script?: false, mixed_number?: false, restriction_level: :ascii,
+         verdict: :safe, reasons: []
+       }]
+     }
+   }},
+  {"optional root has a source label", :check, ["a.", [type: :domain]],
+   %UnicodeSecurity.Result{
+     input: "a.", type: :domain, policy: :strict, verdict: :safe,
+     scripts: [:latin], mixed_script?: false, mixed_number?: false,
+     restriction_level: :ascii, skeleton: "a", unicode_version: "18.0.0",
+     valid_input?: true, reasons: [],
+     domain: %UnicodeSecurity.DomainResult{
+       unicode: "a.", ascii: "a.", trailing_dot?: true, mapped?: false,
+       valid_idna?: true, labels: [
+         %UnicodeSecurity.DomainLabel{
+           index: 0, input: "a", byte_offset: 0, byte_length: 1,
+           codepoint_index: 0, codepoint_count: 1, root?: false,
+           unicode: "a", ascii: "a", mapped?: false, valid_idna?: true,
+           skeleton: "a", scripts: [:latin], resolved_scripts: [:hntl, :latin],
+           mixed_script?: false, mixed_number?: false, restriction_level: :ascii,
+           verdict: :safe, reasons: []
+         },
+         %UnicodeSecurity.DomainLabel{
+           index: 1, input: "", byte_offset: 2, byte_length: 0,
+           codepoint_index: 2, codepoint_count: 0, root?: true,
+           unicode: "", ascii: "", mapped?: false, valid_idna?: true,
+           verdict: :safe, reasons: []
+         }
+       ]
+     }
+   }},
+  {"U-label key", :conflict_key, ["bücher.a", [type: :domain]], "bu\u0308cher.a"},
+  {"A-label key", :conflict_key, ["xn--bcher-kva.a", [type: :domain]], "bu\u0308cher.a"},
+  {"case width separator root key", :conflict_key,
+   ["BÜCHER。ａ.\u00AD", [type: :domain]], "bu\u0308cher.a"},
+  {"skeleton dot escape", :conflict_key, ["a۰b.c", [type: :domain]], "a%2Eb.c"},
+  {"exact domain key", :conflict_key, ["a", [type: :domain]], "a"},
+  {"IDNA-equivalent comparison retains raw canonical facts", :compare,
+   ["a", "A.", [type: :domain]],
+   %UnicodeSecurity.Comparison{
+     confusable?: false, same_skeleton?: true, class: :none,
+     canonically_equivalent?: false, left_skeleton: "a", right_skeleton: "a",
+     left_scripts: [:latin], right_scripts: [:latin],
+     left_resolved_scripts: [:hntl, :latin],
+     right_resolved_scripts: [:hntl, :latin], unicode_version: "18.0.0",
+     mappings: [
+       %{side: :left, byte_offset: 0, byte_length: 1,
+         codepoint_index: 0, codepoint_count: 1, codepoints: [?a],
+         skeleton_spans: [%{codepoint_index: 0, codepoint_count: 1}], mapping: "a"},
+       %{side: :right, byte_offset: 0, byte_length: 1,
+         codepoint_index: 0, codepoint_count: 1, codepoints: [?A],
+         skeleton_spans: [%{codepoint_index: 0, codepoint_count: 1}], mapping: "a"},
+       %{side: :right, byte_offset: 1, byte_length: 1,
+         codepoint_index: 1, codepoint_count: 1, codepoints: [?.],
+         skeleton_spans: [], mapping: ""}
+     ]
+   }},
+  {"combined invalid labels retain safe neighbors", :check,
+   ["a..xn--abc-.a＿b", [type: :domain]],
+   %UnicodeSecurity.Result{
+     input: "a..xn--abc-.a＿b", type: :domain, policy: :strict,
+     verdict: :dangerous, unicode_version: "18.0.0", valid_input?: false,
+     domain: %UnicodeSecurity.DomainResult{
+       unicode: nil, ascii: nil, trailing_dot?: false, mapped?: nil,
+       valid_idna?: false, labels: [
+         %UnicodeSecurity.DomainLabel{
+           index: 0, input: "a", byte_offset: 0, byte_length: 1,
+           codepoint_index: 0, codepoint_count: 1, root?: false,
+           unicode: "a", ascii: "a", mapped?: false, valid_idna?: true,
+           skeleton: "a", scripts: [:latin], resolved_scripts: [:hntl, :latin],
+           mixed_script?: false, mixed_number?: false, restriction_level: :ascii,
+           verdict: :safe
+         },
+         %UnicodeSecurity.DomainLabel{
+           index: 1, input: "", byte_offset: 2, byte_length: 0,
+           codepoint_index: 2, codepoint_count: 0, root?: false,
+           unicode: "", ascii: "", mapped?: false, valid_idna?: false,
+           verdict: :dangerous,
+           reasons: [%UnicodeSecurity.Reason{
+             code: :domain_empty_label, severity: :critical,
+             message: "Domain contains an empty label", byte_offset: 2,
+             codepoint_index: 2,
+             details: %{label: "", label_index: 1, original_byte_offset: 2,
+                        source_scope: :label}
+           }]
+         },
+         %UnicodeSecurity.DomainLabel{
+           index: 2, input: "xn--abc-", byte_offset: 3, byte_length: 8,
+           codepoint_index: 3, codepoint_count: 8, root?: false,
+           unicode: nil, ascii: nil, mapped?: nil, valid_idna?: false,
+           verdict: :dangerous,
+           reasons: [%UnicodeSecurity.Reason{
+             code: :domain_invalid_alabel, severity: :critical,
+             message: "Domain A-label is invalid", byte_offset: 3,
+             codepoint_index: 3,
+             details: %{label: "xn--abc-", label_index: 2, original_byte_offset: 3,
+                        source_scope: :label, rule: :ascii_decode}
+           }]
+         },
+         %UnicodeSecurity.DomainLabel{
+           index: 3, input: "a＿b", byte_offset: 12, byte_length: 5,
+           codepoint_index: 12, codepoint_count: 3, root?: false,
+           unicode: "a_b", ascii: nil, mapped?: true, valid_idna?: false,
+           verdict: :dangerous,
+           reasons: [%UnicodeSecurity.Reason{
+             code: :domain_invalid_ascii, severity: :critical,
+             message: "Domain label violates STD3 ASCII rules", byte_offset: 13,
+             codepoint_index: 13,
+             details: %{label: "a＿b", label_index: 3, original_byte_offset: 13,
+                        source_scope: :scalar, rule: :std3, codepoint: ?_}
+           }]
+         }
+       ]
+     },
+     reasons: [
+       %UnicodeSecurity.Reason{
+         code: :domain_empty_label, severity: :critical,
+         message: "Domain contains an empty label", byte_offset: 2,
+         codepoint_index: 2,
+         details: %{label: "", label_index: 1, original_byte_offset: 2,
+                    source_scope: :label}
+       },
+       %UnicodeSecurity.Reason{
+         code: :domain_invalid_alabel, severity: :critical,
+         message: "Domain A-label is invalid", byte_offset: 3,
+         codepoint_index: 3,
+         details: %{label: "xn--abc-", label_index: 2, original_byte_offset: 3,
+                    source_scope: :label, rule: :ascii_decode}
+       },
+       %UnicodeSecurity.Reason{
+         code: :domain_invalid_ascii, severity: :critical,
+         message: "Domain label violates STD3 ASCII rules", byte_offset: 13,
+         codepoint_index: 13,
+         details: %{label: "a＿b", label_index: 3, original_byte_offset: 13,
+                    source_scope: :scalar, rule: :std3, codepoint: ?_}
+       }
+     ]
+   }},
+  {"invalid UTF-8 has no domain facts", :check, [<<255>>, [type: :domain]],
+   %UnicodeSecurity.Result{
+     input: <<255>>, type: :domain, policy: :strict, verdict: :dangerous,
+     valid_input?: false, unicode_version: "18.0.0",
+     reasons: [%UnicodeSecurity.Reason{
+       code: :invalid_utf8, severity: :critical,
+       message: "Input contains invalid UTF-8", byte_offset: 0,
+       details: %{invalid_byte: 255}
+     }]
+   }},
+  {"strict nontransitional deviation", :check, ["faß", [type: :domain]],
+   %UnicodeSecurity.Result{
+     input: "faß", type: :domain, policy: :strict, verdict: :suspicious,
+     scripts: [:latin], mixed_script?: false, mixed_number?: false,
+     restriction_level: :single_script_restrictive, skeleton: "faß",
+     unicode_version: "18.0.0", valid_input?: true,
+     reasons: [%UnicodeSecurity.Reason{
+       code: :domain_deviation_character, severity: :medium,
+       message: "Domain retains an IDNA deviation character", byte_offset: 2,
+       codepoint_index: 2,
+       details: %{label: "faß", label_index: 0, original_byte_offset: 2,
+                  source_scope: :scalar, codepoint: ?ß}
+     }],
+     domain: %UnicodeSecurity.DomainResult{
+       unicode: "faß", ascii: "xn--fa-hia", trailing_dot?: false,
+       mapped?: false, valid_idna?: true,
+       labels: [%UnicodeSecurity.DomainLabel{
+         index: 0, input: "faß", byte_offset: 0, byte_length: 4,
+         codepoint_index: 0, codepoint_count: 3, root?: false,
+         unicode: "faß", ascii: "xn--fa-hia", mapped?: false, valid_idna?: true,
+         skeleton: "faß", scripts: [:latin], resolved_scripts: [:hntl, :latin],
+         mixed_script?: false, mixed_number?: false,
+         restriction_level: :single_script_restrictive, verdict: :suspicious,
+         reasons: [%UnicodeSecurity.Reason{
+           code: :domain_deviation_character, severity: :medium,
+           message: "Domain retains an IDNA deviation character", byte_offset: 2,
+           codepoint_index: 2,
+           details: %{label: "faß", label_index: 0, original_byte_offset: 2,
+                      source_scope: :scalar, codepoint: ?ß}
+         }]
+       }]
+     }
+   }},
+  {"nonbinary audit item", :audit, [[nil], [type: :domain]],
+   [%UnicodeSecurity.BatchItem{
+     index: 0, input: nil,
+     result: %UnicodeSecurity.Result{
+       input: nil, type: :domain, policy: :strict, verdict: :dangerous,
+       unicode_version: "18.0.0", valid_input?: false,
+       reasons: [%UnicodeSecurity.Reason{
+         code: :invalid_item_type, severity: :critical,
+         message: "Batch item is not a binary", details: %{actual_type: :atom}
+       }]
+     }
+   }]},
+  {"exact domain conflict retains complete evidence", :conflicts,
+   ["a", ["a"], [type: :domain]],
+   [%UnicodeSecurity.Conflict{
+     input: "a", existing: "a", index: 0, key: "a", code: :exact_duplicate,
+     unicode_version: "18.0.0",
+     comparison: %UnicodeSecurity.Comparison{
+       confusable?: false, same_skeleton?: true, class: :none,
+       canonically_equivalent?: true, left_skeleton: "a", right_skeleton: "a",
+       left_scripts: [:latin], right_scripts: [:latin],
+       left_resolved_scripts: [:hntl, :latin],
+       right_resolved_scripts: [:hntl, :latin], unicode_version: "18.0.0",
+       mappings: [
+         %{side: :left, byte_offset: 0, byte_length: 1,
+           codepoint_index: 0, codepoint_count: 1, codepoints: [?a],
+           skeleton_spans: [%{codepoint_index: 0, codepoint_count: 1}], mapping: "a"},
+         %{side: :right, byte_offset: 0, byte_length: 1,
+           codepoint_index: 0, codepoint_count: 1, codepoints: [?a],
+           skeleton_spans: [%{codepoint_index: 0, codepoint_count: 1}], mapping: "a"}
+       ]
+     }
+   }]},
+  {"IDNA-only batch collision has no confusable class", :check_many,
+   [["a", "A"], [type: :domain]],
+   %UnicodeSecurity.BatchResult{
+     unicode_version: "18.0.0", duplicates: [],
+     results: [
+       %UnicodeSecurity.BatchItem{
+         index: 0, input: "a",
+         result: %UnicodeSecurity.Result{
+           input: "a", type: :domain, policy: :strict, verdict: :safe,
+           scripts: [:latin], mixed_script?: false, mixed_number?: false,
+           restriction_level: :ascii, skeleton: "a", unicode_version: "18.0.0",
+           domain: %UnicodeSecurity.DomainResult{
+             unicode: "a", ascii: "a", trailing_dot?: false, mapped?: false,
+             valid_idna?: true,
+             labels: [%UnicodeSecurity.DomainLabel{
+               index: 0, input: "a", byte_offset: 0, byte_length: 1,
+               codepoint_index: 0, codepoint_count: 1, root?: false,
+               unicode: "a", ascii: "a", mapped?: false, valid_idna?: true,
+               skeleton: "a", scripts: [:latin], resolved_scripts: [:hntl, :latin],
+               mixed_script?: false, mixed_number?: false,
+               restriction_level: :ascii, verdict: :safe
+             }]
+           }
+         }
+       },
+       %UnicodeSecurity.BatchItem{
+         index: 1, input: "A",
+         result: %UnicodeSecurity.Result{
+           input: "A", type: :domain, policy: :strict, verdict: :safe,
+           scripts: [:latin], mixed_script?: false, mixed_number?: false,
+           restriction_level: :ascii, skeleton: "a", unicode_version: "18.0.0",
+           domain: %UnicodeSecurity.DomainResult{
+             unicode: "a", ascii: "a", trailing_dot?: false, mapped?: true,
+             valid_idna?: true,
+             labels: [%UnicodeSecurity.DomainLabel{
+               index: 0, input: "A", byte_offset: 0, byte_length: 1,
+               codepoint_index: 0, codepoint_count: 1, root?: false,
+               unicode: "a", ascii: "a", mapped?: true, valid_idna?: true,
+               skeleton: "a", scripts: [:latin], resolved_scripts: [:hntl, :latin],
+               mixed_script?: false, mixed_number?: false,
+               restriction_level: :ascii, verdict: :safe
+             }]
+           }
+         }
+       }
+     ],
+     collisions: [%UnicodeSecurity.Collision{
+       key: "a", class: :none, unicode_version: "18.0.0",
+       indexes: [0, 1], inputs: ["a", "A"], classes: [],
+       reasons: [%UnicodeSecurity.Reason{
+         code: :skeleton_collision, severity: :critical,
+         message: "Identifiers share a skeleton", details: %{indexes: [0, 1]}
+       }]
+     }]
+   }},
+  {"default nontransitional deviation", :check,
+   ["ß", [type: :domain, policy: :default]],
+   %UnicodeSecurity.Result{
+     input: "ß", type: :domain, policy: :default, verdict: :suspicious,
+     scripts: [:latin], mixed_script?: false, mixed_number?: false,
+     restriction_level: :single_script_restrictive, skeleton: "ß",
+     unicode_version: "18.0.0", valid_input?: true,
+     reasons: [%UnicodeSecurity.Reason{
+       code: :domain_deviation_character, severity: :low,
+       message: "Domain retains an IDNA deviation character", byte_offset: 0,
+       codepoint_index: 0,
+       details: %{label: "ß", label_index: 0, original_byte_offset: 0,
+                  source_scope: :scalar, codepoint: ?ß}
+     }],
+     domain: %UnicodeSecurity.DomainResult{
+       unicode: "ß", ascii: "xn--zca", trailing_dot?: false,
+       mapped?: false, valid_idna?: true,
+       labels: [%UnicodeSecurity.DomainLabel{
+         index: 0, input: "ß", byte_offset: 0, byte_length: 2,
+         codepoint_index: 0, codepoint_count: 1, root?: false,
+         unicode: "ß", ascii: "xn--zca", mapped?: false, valid_idna?: true,
+         skeleton: "ß", scripts: [:latin], resolved_scripts: [:hntl, :latin],
+         mixed_script?: false, mixed_number?: false,
+         restriction_level: :single_script_restrictive, verdict: :suspicious,
+         reasons: [%UnicodeSecurity.Reason{
+           code: :domain_deviation_character, severity: :low,
+           message: "Domain retains an IDNA deviation character", byte_offset: 0,
+           codepoint_index: 0,
+           details: %{label: "ß", label_index: 0, original_byte_offset: 0,
+                      source_scope: :scalar, codepoint: ?ß}
+         }]
+       }]
+     }
+   }},
+  {"permissive nontransitional deviation", :check,
+   ["ß", [type: :domain, policy: :permissive]],
+   %UnicodeSecurity.Result{
+     input: "ß", type: :domain, policy: :permissive, verdict: :safe,
+     scripts: [:latin], mixed_script?: false, mixed_number?: false,
+     restriction_level: :single_script_restrictive, skeleton: "ß",
+     unicode_version: "18.0.0", valid_input?: true,
+     reasons: [%UnicodeSecurity.Reason{
+       code: :domain_deviation_character, severity: :info,
+       message: "Domain retains an IDNA deviation character", byte_offset: 0,
+       codepoint_index: 0,
+       details: %{label: "ß", label_index: 0, original_byte_offset: 0,
+                  source_scope: :scalar, codepoint: ?ß}
+     }],
+     domain: %UnicodeSecurity.DomainResult{
+       unicode: "ß", ascii: "xn--zca", trailing_dot?: false,
+       mapped?: false, valid_idna?: true,
+       labels: [%UnicodeSecurity.DomainLabel{
+         index: 0, input: "ß", byte_offset: 0, byte_length: 2,
+         codepoint_index: 0, codepoint_count: 1, root?: false,
+         unicode: "ß", ascii: "xn--zca", mapped?: false, valid_idna?: true,
+         skeleton: "ß", scripts: [:latin], resolved_scripts: [:hntl, :latin],
+         mixed_script?: false, mixed_number?: false,
+         restriction_level: :single_script_restrictive, verdict: :safe,
+         reasons: [%UnicodeSecurity.Reason{
+           code: :domain_deviation_character, severity: :info,
+           message: "Domain retains an IDNA deviation character", byte_offset: 0,
+           codepoint_index: 0,
+           details: %{label: "ß", label_index: 0, original_byte_offset: 0,
+                      source_scope: :scalar, codepoint: ?ß}
+         }]
+       }]
+     }
+   }},
+  {"ignored final root source remains visible", :check,
+   ["a.\u00AD", [type: :domain]],
+   %UnicodeSecurity.Result{
+     input: "a.\u00AD", type: :domain, policy: :strict, verdict: :safe,
+     scripts: [:latin], mixed_script?: false, mixed_number?: false,
+     restriction_level: :ascii, skeleton: "a", unicode_version: "18.0.0",
+     valid_input?: true, reasons: [],
+     domain: %UnicodeSecurity.DomainResult{
+       unicode: "a.", ascii: "a.", trailing_dot?: true, mapped?: true,
+       valid_idna?: true, labels: [
+         %UnicodeSecurity.DomainLabel{
+           index: 0, input: "a", byte_offset: 0, byte_length: 1,
+           codepoint_index: 0, codepoint_count: 1, root?: false,
+           unicode: "a", ascii: "a", mapped?: false, valid_idna?: true,
+           skeleton: "a", scripts: [:latin], resolved_scripts: [:hntl, :latin],
+           mixed_script?: false, mixed_number?: false, restriction_level: :ascii,
+           verdict: :safe
+         },
+         %UnicodeSecurity.DomainLabel{
+           index: 1, input: "\u00AD", byte_offset: 2, byte_length: 2,
+           codepoint_index: 2, codepoint_count: 1, root?: true,
+           unicode: "", ascii: "", mapped?: true, valid_idna?: true,
+           verdict: :safe
+         }
+       ]
+     }
+   }},
+  {"NFC composition keeps earliest scalar offset", :check,
+   ["e\u0306", [type: :domain]],
+   %UnicodeSecurity.Result{
+     input: "e\u0306", type: :domain, policy: :strict, verdict: :dangerous,
+     scripts: [:latin], mixed_script?: false, mixed_number?: false,
+     restriction_level: :single_script_restrictive, skeleton: "e\u0306",
+     unicode_version: "18.0.0", valid_input?: true,
+     reasons: [%UnicodeSecurity.Reason{
+       code: :restricted_character, severity: :high,
+       message: "Character has Restricted identifier status", byte_offset: 0,
+       codepoint_index: 0,
+       details: %{label: "e\u0306", label_index: 0, original_byte_offset: 0,
+                  source_scope: :scalar, codepoint: 0x0115,
+                  identifier_types: [:uncommon_use]}
+     }],
+     domain: %UnicodeSecurity.DomainResult{
+       unicode: "ĕ", ascii: "xn--jea", trailing_dot?: false,
+       mapped?: true, valid_idna?: true,
+       labels: [%UnicodeSecurity.DomainLabel{
+         index: 0, input: "e\u0306", byte_offset: 0, byte_length: 3,
+         codepoint_index: 0, codepoint_count: 2, root?: false,
+         unicode: "ĕ", ascii: "xn--jea", mapped?: true, valid_idna?: true,
+         skeleton: "e\u0306", scripts: [:latin], resolved_scripts: [:hntl, :latin],
+         mixed_script?: false, mixed_number?: false,
+         restriction_level: :single_script_restrictive, verdict: :dangerous,
+         reasons: [%UnicodeSecurity.Reason{
+           code: :restricted_character, severity: :high,
+           message: "Character has Restricted identifier status", byte_offset: 0,
+           codepoint_index: 0,
+           details: %{label: "e\u0306", label_index: 0, original_byte_offset: 0,
+                      source_scope: :scalar, codepoint: 0x0115,
+                      identifier_types: [:uncommon_use]}
+         }]
+       }]
+     }
+   }},
+  {"A-label security finding uses original label scope", :check,
+   ["xn--jea", [type: :domain]],
+   %UnicodeSecurity.Result{
+     input: "xn--jea", type: :domain, policy: :strict, verdict: :dangerous,
+     scripts: [:latin], mixed_script?: false, mixed_number?: false,
+     restriction_level: :single_script_restrictive, skeleton: "e\u0306",
+     unicode_version: "18.0.0", valid_input?: true,
+     reasons: [%UnicodeSecurity.Reason{
+       code: :restricted_character, severity: :high,
+       message: "Character has Restricted identifier status", byte_offset: 0,
+       codepoint_index: 0,
+       details: %{label: "xn--jea", label_index: 0, original_byte_offset: 0,
+                  source_scope: :label, codepoint: 0x0115,
+                  identifier_types: [:uncommon_use]}
+     }],
+     domain: %UnicodeSecurity.DomainResult{
+       unicode: "ĕ", ascii: "xn--jea", trailing_dot?: false,
+       mapped?: true, valid_idna?: true,
+       labels: [%UnicodeSecurity.DomainLabel{
+         index: 0, input: "xn--jea", byte_offset: 0, byte_length: 7,
+         codepoint_index: 0, codepoint_count: 7, root?: false,
+         unicode: "ĕ", ascii: "xn--jea", mapped?: true, valid_idna?: true,
+         skeleton: "e\u0306", scripts: [:latin], resolved_scripts: [:hntl, :latin],
+         mixed_script?: false, mixed_number?: false,
+         restriction_level: :single_script_restrictive, verdict: :dangerous,
+         reasons: [%UnicodeSecurity.Reason{
+           code: :restricted_character, severity: :high,
+           message: "Character has Restricted identifier status", byte_offset: 0,
+           codepoint_index: 0,
+           details: %{label: "xn--jea", label_index: 0, original_byte_offset: 0,
+                      source_scope: :label, codepoint: 0x0115,
+                      identifier_types: [:uncommon_use]}
+         }]
+       }]
+     }
+   }},
+  {"leading hyphen invalidity", :check, ["-a", [type: :domain]],
+   %UnicodeSecurity.Result{
+     input: "-a", type: :domain, policy: :strict, verdict: :dangerous,
+     unicode_version: "18.0.0", valid_input?: false,
+     reasons: [%UnicodeSecurity.Reason{
+       code: :domain_hyphen_rule, severity: :critical,
+       message: "Domain label violates the hyphen rule", byte_offset: 0,
+       codepoint_index: 0,
+       details: %{label: "-a", label_index: 0, original_byte_offset: 0,
+                  source_scope: :scalar, rule: :leading_hyphen, codepoint: ?-}
+     }],
+     domain: %UnicodeSecurity.DomainResult{
+       unicode: nil, ascii: nil, trailing_dot?: false, mapped?: nil,
+       valid_idna?: false,
+       labels: [%UnicodeSecurity.DomainLabel{
+         index: 0, input: "-a", byte_offset: 0, byte_length: 2,
+         codepoint_index: 0, codepoint_count: 2, root?: false,
+         unicode: "-a", ascii: nil, mapped?: false, valid_idna?: false,
+         verdict: :dangerous,
+         reasons: [%UnicodeSecurity.Reason{
+           code: :domain_hyphen_rule, severity: :critical,
+           message: "Domain label violates the hyphen rule", byte_offset: 0,
+           codepoint_index: 0,
+           details: %{label: "-a", label_index: 0, original_byte_offset: 0,
+                      source_scope: :scalar, rule: :leading_hyphen, codepoint: ?-}
+         }]
+       }]
+     }
+   }},
+  {"leading mark IDNA failure", :check, ["\u0308a", [type: :domain]],
+   %UnicodeSecurity.Result{
+     input: "\u0308a", type: :domain, policy: :strict, verdict: :dangerous,
+     unicode_version: "18.0.0", valid_input?: false,
+     reasons: [%UnicodeSecurity.Reason{
+       code: :domain_idna_disallowed, severity: :critical,
+       message: "Domain label violates IDNA validity", byte_offset: 0,
+       codepoint_index: 0,
+       details: %{label: "\u0308a", label_index: 0, original_byte_offset: 0,
+                  source_scope: :scalar, rule: :leading_mark, codepoint: 0x0308}
+     }],
+     domain: %UnicodeSecurity.DomainResult{
+       unicode: nil, ascii: nil, trailing_dot?: false, mapped?: nil,
+       valid_idna?: false,
+       labels: [%UnicodeSecurity.DomainLabel{
+         index: 0, input: "\u0308a", byte_offset: 0, byte_length: 3,
+         codepoint_index: 0, codepoint_count: 2, root?: false,
+         unicode: "\u0308a", ascii: nil, mapped?: false, valid_idna?: false,
+         verdict: :dangerous,
+         reasons: [%UnicodeSecurity.Reason{
+           code: :domain_idna_disallowed, severity: :critical,
+           message: "Domain label violates IDNA validity", byte_offset: 0,
+           codepoint_index: 0,
+           details: %{label: "\u0308a", label_index: 0, original_byte_offset: 0,
+                      source_scope: :scalar, rule: :leading_mark, codepoint: 0x0308}
+         }]
+       }]
+     }
+   }},
+  {"invalid joiner retains deviation advisory", :check,
+   ["a\u200D", [type: :domain]],
+   %UnicodeSecurity.Result{
+     input: "a\u200D", type: :domain, policy: :strict, verdict: :dangerous,
+     unicode_version: "18.0.0", valid_input?: false,
+     reasons: [
+       %UnicodeSecurity.Reason{
+         code: :domain_deviation_character, severity: :medium,
+         message: "Domain retains an IDNA deviation character", byte_offset: 1,
+         codepoint_index: 1,
+         details: %{label: "a\u200D", label_index: 0, original_byte_offset: 1,
+                    source_scope: :scalar, codepoint: 0x200D}
+       },
+       %UnicodeSecurity.Reason{
+         code: :domain_joiner_rule, severity: :critical,
+         message: "Domain join control fails CONTEXTJ", byte_offset: 1,
+         codepoint_index: 1,
+         details: %{label: "a\u200D", label_index: 0, original_byte_offset: 1,
+                    source_scope: :scalar, rule: :contextj, codepoint: 0x200D}
+       }
+     ],
+     domain: %UnicodeSecurity.DomainResult{
+       unicode: nil, ascii: nil, trailing_dot?: false, mapped?: nil,
+       valid_idna?: false,
+       labels: [%UnicodeSecurity.DomainLabel{
+         index: 0, input: "a\u200D", byte_offset: 0, byte_length: 4,
+         codepoint_index: 0, codepoint_count: 2, root?: false,
+         unicode: "a\u200D", ascii: nil, mapped?: false, valid_idna?: false,
+         verdict: :dangerous,
+         reasons: [
+           %UnicodeSecurity.Reason{
+             code: :domain_deviation_character, severity: :medium,
+             message: "Domain retains an IDNA deviation character", byte_offset: 1,
+             codepoint_index: 1,
+             details: %{label: "a\u200D", label_index: 0, original_byte_offset: 1,
+                        source_scope: :scalar, codepoint: 0x200D}
+           },
+           %UnicodeSecurity.Reason{
+             code: :domain_joiner_rule, severity: :critical,
+             message: "Domain join control fails CONTEXTJ", byte_offset: 1,
+             codepoint_index: 1,
+             details: %{label: "a\u200D", label_index: 0, original_byte_offset: 1,
+                        source_scope: :scalar, rule: :contextj, codepoint: 0x200D}
+           }
+         ]
+       }]
+     }
+   }},
+  {"whole-name RTL activation invalidates numeric-leading LTR label", :check,
+   ["1a.א", [type: :domain]],
+   %UnicodeSecurity.Result{
+     input: "1a.א", type: :domain, policy: :strict, verdict: :dangerous,
+     unicode_version: "18.0.0", valid_input?: false,
+     reasons: [%UnicodeSecurity.Reason{
+       code: :domain_bidi_rule, severity: :critical,
+       message: "Domain label violates the IDNA bidi rule", byte_offset: 0,
+       codepoint_index: 0,
+       details: %{label: "1a", label_index: 0, original_byte_offset: 0,
+                  source_scope: :scalar, rule: :first, codepoint: ?1}
+     }],
+     domain: %UnicodeSecurity.DomainResult{
+       unicode: nil, ascii: nil, trailing_dot?: false, mapped?: nil,
+       valid_idna?: false,
+       labels: [
+         %UnicodeSecurity.DomainLabel{
+           index: 0, input: "1a", byte_offset: 0, byte_length: 2,
+           codepoint_index: 0, codepoint_count: 2, root?: false,
+           unicode: "1a", ascii: "1a", mapped?: false, valid_idna?: false,
+           verdict: :dangerous,
+           reasons: [%UnicodeSecurity.Reason{
+             code: :domain_bidi_rule, severity: :critical,
+             message: "Domain label violates the IDNA bidi rule", byte_offset: 0,
+             codepoint_index: 0,
+             details: %{label: "1a", label_index: 0, original_byte_offset: 0,
+                        source_scope: :scalar, rule: :first, codepoint: ?1}
+           }]
+         },
+         %UnicodeSecurity.DomainLabel{
+           index: 1, input: "א", byte_offset: 3, byte_length: 2,
+           codepoint_index: 3, codepoint_count: 1, root?: false,
+           unicode: "א", ascii: "xn--4db", mapped?: false, valid_idna?: true,
+           skeleton: "א", scripts: [:hebrew], resolved_scripts: [:hebrew],
+           mixed_script?: false, mixed_number?: false,
+           restriction_level: :single_script_restrictive, verdict: :safe
+         }
+       ]
+     }
+   }},
+  {"ASCII label byte limit", :check,
+   ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", [type: :domain]],
+   %UnicodeSecurity.Result{
+     input: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     type: :domain, policy: :strict, verdict: :dangerous,
+     unicode_version: "18.0.0", valid_input?: false,
+     reasons: [%UnicodeSecurity.Reason{
+       code: :domain_label_too_long, severity: :critical,
+       message: "Domain label exceeds the ASCII byte limit", byte_offset: 0,
+       codepoint_index: 0,
+       details: %{
+         label: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+         label_index: 0, original_byte_offset: 0, source_scope: :label,
+         actual_bytes: 64, maximum_bytes: 63
+       }
+     }],
+     domain: %UnicodeSecurity.DomainResult{
+       unicode: nil, ascii: nil, trailing_dot?: false, mapped?: nil,
+       valid_idna?: false,
+       labels: [%UnicodeSecurity.DomainLabel{
+         index: 0,
+         input: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+         byte_offset: 0, byte_length: 64, codepoint_index: 0,
+         codepoint_count: 64, root?: false,
+         unicode: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+         ascii: nil, mapped?: false, valid_idna?: false, verdict: :dangerous,
+         reasons: [%UnicodeSecurity.Reason{
+           code: :domain_label_too_long, severity: :critical,
+           message: "Domain label exceeds the ASCII byte limit", byte_offset: 0,
+           codepoint_index: 0,
+           details: %{
+             label: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+             label_index: 0, original_byte_offset: 0, source_scope: :label,
+             actual_bytes: 64, maximum_bytes: 63
+           }
+         }]
+       }]
+     }
+   }},
+  {"hostname syntax has static message", :check, ["a/b", [type: :domain]],
+   %UnicodeSecurity.Result{
+     input: "a/b", type: :domain, policy: :strict, verdict: :dangerous,
+     unicode_version: "18.0.0", valid_input?: false,
+     reasons: [
+       %UnicodeSecurity.Reason{
+         code: :domain_invalid_ascii, severity: :critical,
+         message: "Domain label violates STD3 ASCII rules", byte_offset: 1,
+         codepoint_index: 1,
+         details: %{label: "a/b", label_index: 0, original_byte_offset: 1,
+                    source_scope: :scalar, rule: :std3, codepoint: ?/}
+       },
+       %UnicodeSecurity.Reason{
+         code: :domain_invalid_hostname, severity: :critical,
+         message: "Input is not a hostname", byte_offset: 1,
+         codepoint_index: 1,
+         details: %{label: "a/b", label_index: 0, original_byte_offset: 1,
+                    source_scope: :scalar, rule: :hostname_syntax, codepoint: ?/}
+       }
+     ],
+     domain: %UnicodeSecurity.DomainResult{
+       unicode: nil, ascii: nil, trailing_dot?: false, mapped?: nil,
+       valid_idna?: false,
+       labels: [%UnicodeSecurity.DomainLabel{
+         index: 0, input: "a/b", byte_offset: 0, byte_length: 3,
+         codepoint_index: 0, codepoint_count: 3, root?: false,
+         unicode: "a/b", ascii: nil, mapped?: false, valid_idna?: false,
+         verdict: :dangerous,
+         reasons: [
+           %UnicodeSecurity.Reason{
+             code: :domain_invalid_ascii, severity: :critical,
+             message: "Domain label violates STD3 ASCII rules", byte_offset: 1,
+             codepoint_index: 1,
+             details: %{label: "a/b", label_index: 0, original_byte_offset: 1,
+                        source_scope: :scalar, rule: :std3, codepoint: ?/}
+           },
+           %UnicodeSecurity.Reason{
+             code: :domain_invalid_hostname, severity: :critical,
+             message: "Input is not a hostname", byte_offset: 1,
+             codepoint_index: 1,
+             details: %{label: "a/b", label_index: 0, original_byte_offset: 1,
+                        source_scope: :scalar, rule: :hostname_syntax, codepoint: ?/}
+           }
+         ]
+       }]
+     }
+   }},
+  {"ASCII name 254-byte limit", :check,
+   ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", [type: :domain]],
+   %UnicodeSecurity.Result{
+     input: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     type: :domain, policy: :strict, verdict: :dangerous,
+     unicode_version: "18.0.0", valid_input?: false,
+     reasons: [%UnicodeSecurity.Reason{
+       code: :domain_name_too_long, severity: :critical,
+       message: "Domain exceeds the ASCII byte limit",
+       details: %{label: nil, label_index: nil, original_byte_offset: nil,
+                  actual_bytes: 254, maximum_bytes: 253}
+     }],
+     domain: %UnicodeSecurity.DomainResult{
+       unicode: nil, ascii: nil, trailing_dot?: false, mapped?: nil,
+       valid_idna?: false,
+       labels: [
+         %UnicodeSecurity.DomainLabel{
+           index: 0,
+           input: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+           byte_offset: 0, byte_length: 63, codepoint_index: 0,
+           codepoint_count: 63, root?: false,
+           unicode: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+           ascii: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+           mapped?: false, valid_idna?: true,
+           skeleton: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+           scripts: [:latin], resolved_scripts: [:hntl, :latin],
+           mixed_script?: false, mixed_number?: false, restriction_level: :ascii,
+           verdict: :safe
+         },
+         %UnicodeSecurity.DomainLabel{
+           index: 1,
+           input: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+           byte_offset: 64, byte_length: 63, codepoint_index: 64,
+           codepoint_count: 63, root?: false,
+           unicode: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+           ascii: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+           mapped?: false, valid_idna?: true,
+           skeleton: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+           scripts: [:latin], resolved_scripts: [:hntl, :latin],
+           mixed_script?: false, mixed_number?: false, restriction_level: :ascii,
+           verdict: :safe
+         },
+         %UnicodeSecurity.DomainLabel{
+           index: 2,
+           input: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+           byte_offset: 128, byte_length: 63, codepoint_index: 128,
+           codepoint_count: 63, root?: false,
+           unicode: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+           ascii: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+           mapped?: false, valid_idna?: true,
+           skeleton: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+           scripts: [:latin], resolved_scripts: [:hntl, :latin],
+           mixed_script?: false, mixed_number?: false, restriction_level: :ascii,
+           verdict: :safe
+         },
+         %UnicodeSecurity.DomainLabel{
+           index: 3,
+           input: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+           byte_offset: 192, byte_length: 62, codepoint_index: 192,
+           codepoint_count: 62, root?: false,
+           unicode: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+           ascii: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+           mapped?: false, valid_idna?: true,
+           skeleton: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+           scripts: [:latin], resolved_scripts: [:hntl, :latin],
+           mixed_script?: false, mixed_number?: false, restriction_level: :ascii,
+           verdict: :safe
+         }
+       ]
+     }
+   }},
+  {"4097-byte original input has no domain facts", :check,
+   [<<0::size(32776)>>, [type: :domain]],
+   %UnicodeSecurity.Result{
+     input: <<0::size(32776)>>, type: :domain, policy: :strict,
+     verdict: :dangerous, unicode_version: "18.0.0", valid_input?: false,
+     reasons: [%UnicodeSecurity.Reason{
+       code: :input_too_long, severity: :critical,
+       message: "Input exceeds the byte limit", byte_offset: 4096,
+       details: %{actual_bytes: 4097, maximum_bytes: 4096}
+     }]
+   }},
+  {"scripts stay isolated across labels", :check, ["a.α", [type: :domain]],
+   %UnicodeSecurity.Result{
+     input: "a.α", type: :domain, policy: :strict, verdict: :safe,
+     scripts: [:greek, :latin], mixed_script?: false, mixed_number?: false,
+     restriction_level: :single_script_restrictive, skeleton: "a.a",
+     unicode_version: "18.0.0", valid_input?: true,
+     domain: %UnicodeSecurity.DomainResult{
+       unicode: "a.α", ascii: "a.xn--mxa", trailing_dot?: false,
+       mapped?: false, valid_idna?: true,
+       labels: [
+         %UnicodeSecurity.DomainLabel{
+           index: 0, input: "a", byte_offset: 0, byte_length: 1,
+           codepoint_index: 0, codepoint_count: 1, root?: false,
+           unicode: "a", ascii: "a", mapped?: false, valid_idna?: true,
+           skeleton: "a", scripts: [:latin], resolved_scripts: [:hntl, :latin],
+           mixed_script?: false, mixed_number?: false,
+           restriction_level: :ascii, verdict: :safe
+         },
+         %UnicodeSecurity.DomainLabel{
+           index: 1, input: "α", byte_offset: 2, byte_length: 2,
+           codepoint_index: 2, codepoint_count: 1, root?: false,
+           unicode: "α", ascii: "xn--mxa", mapped?: false, valid_idna?: true,
+           skeleton: "a", scripts: [:greek], resolved_scripts: [:greek],
+           mixed_script?: false, mixed_number?: false,
+           restriction_level: :single_script_restrictive, verdict: :safe
+         }
+       ]
+     }
+   }},
+  {"mixed scripts in one label have one scoped finding", :check,
+   ["aα.b", [type: :domain]],
+   %UnicodeSecurity.Result{
+     input: "aα.b", type: :domain, policy: :strict, verdict: :dangerous,
+     scripts: [:greek, :latin], mixed_script?: true, mixed_number?: false,
+     restriction_level: :minimally_restrictive, skeleton: "aa.b",
+     unicode_version: "18.0.0", valid_input?: true,
+     reasons: [
+       %UnicodeSecurity.Reason{
+         code: :mixed_scripts, severity: :high,
+         message: "Multiple effective scripts are present",
+         details: %{label: "aα", label_index: 0, original_byte_offset: nil,
+                    scripts: [:greek, :latin]}
+       },
+       %UnicodeSecurity.Reason{
+         code: :restriction_level_below_policy, severity: :high,
+         message: "Restriction level is below the policy minimum",
+         details: %{label: "aα", label_index: 0, original_byte_offset: nil,
+                    actual: :minimally_restrictive, minimum: :highly_restrictive}
+       }
+     ],
+     domain: %UnicodeSecurity.DomainResult{
+       unicode: "aα.b", ascii: "xn--a-zlb.b", trailing_dot?: false,
+       mapped?: false, valid_idna?: true,
+       labels: [
+         %UnicodeSecurity.DomainLabel{
+           index: 0, input: "aα", byte_offset: 0, byte_length: 3,
+           codepoint_index: 0, codepoint_count: 2, root?: false,
+           unicode: "aα", ascii: "xn--a-zlb", mapped?: false, valid_idna?: true,
+           skeleton: "aa", scripts: [:greek, :latin], resolved_scripts: [],
+           mixed_script?: true, mixed_number?: false,
+           restriction_level: :minimally_restrictive, verdict: :dangerous,
+           reasons: [
+             %UnicodeSecurity.Reason{
+               code: :mixed_scripts, severity: :high,
+               message: "Multiple effective scripts are present",
+               details: %{label: "aα", label_index: 0, original_byte_offset: nil,
+                          scripts: [:greek, :latin]}
+             },
+             %UnicodeSecurity.Reason{
+               code: :restriction_level_below_policy, severity: :high,
+               message: "Restriction level is below the policy minimum",
+               details: %{label: "aα", label_index: 0, original_byte_offset: nil,
+                          actual: :minimally_restrictive, minimum: :highly_restrictive}
+             }
+           ]
+         },
+         %UnicodeSecurity.DomainLabel{
+           index: 1, input: "b", byte_offset: 4, byte_length: 1,
+           codepoint_index: 3, codepoint_count: 1, root?: false,
+           unicode: "b", ascii: "b", mapped?: false, valid_idna?: true,
+           skeleton: "b", scripts: [:latin], resolved_scripts: [:hntl, :latin],
+           mixed_script?: false, mixed_number?: false,
+           restriction_level: :ascii, verdict: :safe
+         }
+       ]
+     }
+   }},
+  {"number systems stay isolated across labels", :check,
+   ["1.९", [type: :domain]],
+   %UnicodeSecurity.Result{
+     input: "1.९", type: :domain, policy: :strict, verdict: :safe,
+     scripts: [:common, :devanagari], mixed_script?: false, mixed_number?: false,
+     restriction_level: :single_script_restrictive, skeleton: "l.९",
+     unicode_version: "18.0.0", valid_input?: true,
+     domain: %UnicodeSecurity.DomainResult{
+       unicode: "1.९", ascii: "1.xn--m4b", trailing_dot?: false,
+       mapped?: false, valid_idna?: true,
+       labels: [
+         %UnicodeSecurity.DomainLabel{
+           index: 0, input: "1", byte_offset: 0, byte_length: 1,
+           codepoint_index: 0, codepoint_count: 1, root?: false,
+           unicode: "1", ascii: "1", mapped?: false, valid_idna?: true,
+           skeleton: "l", scripts: [:common], resolved_scripts: :all,
+           mixed_script?: false, mixed_number?: false,
+           restriction_level: :ascii, verdict: :safe
+         },
+         %UnicodeSecurity.DomainLabel{
+           index: 1, input: "९", byte_offset: 2, byte_length: 3,
+           codepoint_index: 2, codepoint_count: 1, root?: false,
+           unicode: "९", ascii: "xn--m4b", mapped?: false, valid_idna?: true,
+           skeleton: "९", scripts: [:devanagari],
+           resolved_scripts: [:devanagari, :dogra, :kaithi, :mahajani],
+           mixed_script?: false, mixed_number?: false,
+           restriction_level: :single_script_restrictive, verdict: :safe
+         }
+       ]
+     }
+   }},
+  {"mixed numbers in one label have one scoped finding", :check,
+   ["1९.a", [type: :domain]],
+   %UnicodeSecurity.Result{
+     input: "1९.a", type: :domain, policy: :strict, verdict: :dangerous,
+     scripts: [:common, :devanagari, :latin], mixed_script?: false,
+     mixed_number?: true, restriction_level: :single_script_restrictive,
+     skeleton: "l९.a", unicode_version: "18.0.0", valid_input?: true,
+     reasons: [%UnicodeSecurity.Reason{
+       code: :mixed_numbers, severity: :high,
+       message: "Multiple decimal number systems are present",
+       details: %{label: "1९", label_index: 0, original_byte_offset: nil,
+                  zero_codepoints: [48, 2406]}
+     }],
+     domain: %UnicodeSecurity.DomainResult{
+       unicode: "1९.a", ascii: "xn--1-zzd.a", trailing_dot?: false,
+       mapped?: false, valid_idna?: true,
+       labels: [
+         %UnicodeSecurity.DomainLabel{
+           index: 0, input: "1९", byte_offset: 0, byte_length: 4,
+           codepoint_index: 0, codepoint_count: 2, root?: false,
+           unicode: "1९", ascii: "xn--1-zzd", mapped?: false, valid_idna?: true,
+           skeleton: "l९", scripts: [:common, :devanagari],
+           resolved_scripts: [:devanagari, :dogra, :kaithi, :mahajani],
+           mixed_script?: false, mixed_number?: true,
+           restriction_level: :single_script_restrictive, verdict: :dangerous,
+           reasons: [%UnicodeSecurity.Reason{
+             code: :mixed_numbers, severity: :high,
+             message: "Multiple decimal number systems are present",
+             details: %{label: "1९", label_index: 0, original_byte_offset: nil,
+                        zero_codepoints: [48, 2406]}
+           }]
+         },
+         %UnicodeSecurity.DomainLabel{
+           index: 1, input: "a", byte_offset: 5, byte_length: 1,
+           codepoint_index: 3, codepoint_count: 1, root?: false,
+           unicode: "a", ascii: "a", mapped?: false, valid_idna?: true,
+           skeleton: "a", scripts: [:latin], resolved_scripts: [:hntl, :latin],
+           mixed_script?: false, mixed_number?: false,
+           restriction_level: :ascii, verdict: :safe
+         }
+       ]
+     }
+   }},
+  {"IDNA-only conflict is a skeleton collision", :conflicts,
+   ["a", ["A"], [type: :domain]],
+   [%UnicodeSecurity.Conflict{
+     input: "a", existing: "A", index: 0, key: "a",
+     code: :skeleton_collision, unicode_version: "18.0.0",
+     comparison: %UnicodeSecurity.Comparison{
+       confusable?: false, same_skeleton?: true, class: :none,
+       canonically_equivalent?: false, left_skeleton: "a", right_skeleton: "a",
+       left_scripts: [:latin], right_scripts: [:latin],
+       left_resolved_scripts: [:hntl, :latin],
+       right_resolved_scripts: [:hntl, :latin], unicode_version: "18.0.0",
+       mappings: [
+         %{side: :left, byte_offset: 0, byte_length: 1,
+           codepoint_index: 0, codepoint_count: 1, codepoints: [?a],
+           skeleton_spans: [%{codepoint_index: 0, codepoint_count: 1}], mapping: "a"},
+         %{side: :right, byte_offset: 0, byte_length: 1,
+           codepoint_index: 0, codepoint_count: 1, codepoints: [?A],
+           skeleton_spans: [%{codepoint_index: 0, codepoint_count: 1}], mapping: "a"}
+       ]
+     }
+   }]},
+  {"whole-script domain conflict", :conflicts,
+   ["a", ["а"], [type: :domain]],
+   [%UnicodeSecurity.Conflict{
+     input: "a", existing: "а", index: 0, key: "a",
+     code: :whole_script_confusable, unicode_version: "18.0.0",
+     comparison: %UnicodeSecurity.Comparison{
+       confusable?: true, same_skeleton?: true, class: :whole_script_confusable,
+       canonically_equivalent?: false, left_skeleton: "a", right_skeleton: "a",
+       left_scripts: [:latin], right_scripts: [:cyrillic],
+       left_resolved_scripts: [:hntl, :latin], right_resolved_scripts: [:cyrillic],
+       unicode_version: "18.0.0",
+       mappings: [
+         %{side: :left, byte_offset: 0, byte_length: 1,
+           codepoint_index: 0, codepoint_count: 1, codepoints: [?a],
+           skeleton_spans: [%{codepoint_index: 0, codepoint_count: 1}], mapping: "a"},
+         %{side: :right, byte_offset: 0, byte_length: 2,
+           codepoint_index: 0, codepoint_count: 1, codepoints: [0x0430],
+           skeleton_spans: [%{codepoint_index: 0, codepoint_count: 1}], mapping: "a"}
+       ]
+     }
+   }]},
+  {"invalid binary duplicates remain grouped", :check_many,
+   [[<<255>>, <<255>>], [type: :domain]],
+   %UnicodeSecurity.BatchResult{
+     unicode_version: "18.0.0", collisions: [],
+     results: [
+       %UnicodeSecurity.BatchItem{
+         index: 0, input: <<255>>,
+         result: %UnicodeSecurity.Result{
+           input: <<255>>, type: :domain, policy: :strict, verdict: :dangerous,
+           unicode_version: "18.0.0", valid_input?: false,
+           reasons: [%UnicodeSecurity.Reason{
+             code: :invalid_utf8, severity: :critical,
+             message: "Input contains invalid UTF-8", byte_offset: 0,
+             details: %{invalid_byte: 255}
+           }]
+         }
+       },
+       %UnicodeSecurity.BatchItem{
+         index: 1, input: <<255>>,
+         result: %UnicodeSecurity.Result{
+           input: <<255>>, type: :domain, policy: :strict, verdict: :dangerous,
+           unicode_version: "18.0.0", valid_input?: false,
+           reasons: [%UnicodeSecurity.Reason{
+             code: :invalid_utf8, severity: :critical,
+             message: "Input contains invalid UTF-8", byte_offset: 0,
+             details: %{invalid_byte: 255}
+           }]
+         }
+       }
+     ],
+     duplicates: [%UnicodeSecurity.Duplicate{
+       input: <<255>>, indexes: [0, 1], unicode_version: "18.0.0",
+       reasons: [%UnicodeSecurity.Reason{
+         code: :exact_duplicate, severity: :info,
+         message: "Identifier is an exact duplicate", details: %{indexes: [0, 1]}
+       }]
+     }]
+   }},
+  {"whole-script correlated batch group", :check_many,
+   [["a", "а"], [type: :domain]],
+   %UnicodeSecurity.BatchResult{
+     unicode_version: "18.0.0", duplicates: [],
+     results: [
+       %UnicodeSecurity.BatchItem{
+         index: 0, input: "a",
+         result: %UnicodeSecurity.Result{
+           input: "a", type: :domain, policy: :strict, verdict: :safe,
+           scripts: [:latin], mixed_script?: false, mixed_number?: false,
+           restriction_level: :ascii, skeleton: "a", unicode_version: "18.0.0",
+           domain: %UnicodeSecurity.DomainResult{
+             unicode: "a", ascii: "a", trailing_dot?: false, mapped?: false,
+             valid_idna?: true,
+             labels: [%UnicodeSecurity.DomainLabel{
+               index: 0, input: "a", byte_offset: 0, byte_length: 1,
+               codepoint_index: 0, codepoint_count: 1, root?: false,
+               unicode: "a", ascii: "a", mapped?: false, valid_idna?: true,
+               skeleton: "a", scripts: [:latin], resolved_scripts: [:hntl, :latin],
+               mixed_script?: false, mixed_number?: false,
+               restriction_level: :ascii, verdict: :safe
+             }]
+           }
+         }
+       },
+       %UnicodeSecurity.BatchItem{
+         index: 1, input: "а",
+         result: %UnicodeSecurity.Result{
+           input: "а", type: :domain, policy: :strict, verdict: :safe,
+           scripts: [:cyrillic], mixed_script?: false, mixed_number?: false,
+           restriction_level: :single_script_restrictive, skeleton: "a",
+           unicode_version: "18.0.0",
+           domain: %UnicodeSecurity.DomainResult{
+             unicode: "а", ascii: "xn--80a", trailing_dot?: false, mapped?: false,
+             valid_idna?: true,
+             labels: [%UnicodeSecurity.DomainLabel{
+               index: 0, input: "а", byte_offset: 0, byte_length: 2,
+               codepoint_index: 0, codepoint_count: 1, root?: false,
+               unicode: "а", ascii: "xn--80a", mapped?: false, valid_idna?: true,
+               skeleton: "a", scripts: [:cyrillic], resolved_scripts: [:cyrillic],
+               mixed_script?: false, mixed_number?: false,
+               restriction_level: :single_script_restrictive, verdict: :safe
+             }]
+           }
+         }
+       }
+     ],
+     collisions: [%UnicodeSecurity.Collision{
+       key: "a", class: :whole_script_confusable,
+       classes: [:whole_script_confusable], unicode_version: "18.0.0",
+       indexes: [0, 1], inputs: ["a", "а"],
+       reasons: [
+         %UnicodeSecurity.Reason{
+           code: :skeleton_collision, severity: :critical,
+           message: "Identifiers share a skeleton", details: %{indexes: [0, 1]}
+         },
+         %UnicodeSecurity.Reason{
+           code: :whole_script_confusable, severity: :critical,
+           message: "Identifiers are whole-script confusables", details: %{indexes: [0, 1]}
+         }
+       ]
+     }]
+   }},
+  {"invalid domain exception has static metadata", :conflict_key,
+   ["a..b", [type: :domain]],
+   %UnicodeSecurity.InvalidDomainError{
+     reason: :domain_empty_label, byte_offset: 2, label_index: 1
+   }}
+]}

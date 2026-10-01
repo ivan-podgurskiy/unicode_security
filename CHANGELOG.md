@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Explicit `type: :domain` hostname checks using pinned Unicode 18 UTS #46
+  revision 36 nontransitional processing, per-label policy facts and source spans,
+  optional final root, DNS byte limits, partial invalid results and stable reasons.
+- Domain-aware comparison keys, original-label evidence, conflicts, lazy audit,
+  and correlated batch classes; literal public contracts and a source-free
+  runtime acceptance test cover the new modules.
+- Milestone 4 hostname and batch benchmark. The IDNA mapping and conformance
+  sources are individually final; the combined Unicode 18 release remains draft.
 - Pairwise comparison, type-scoped conflict keys and existing-set conflict checks
   with original scalar-to-skeleton mapping evidence and all three confusable classes.
 - Lazy indexed audit and eager batch analysis with separate exact duplicates and
@@ -56,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Unicode 18.0.0 sources remain draft; this milestone is not releasable.
 - Skeletons are comparison keys only, never replacements or authorization
-  decisions. Domains/IDNA and Ecto are planned later; `type: :domain` remains unsupported.
+  decisions. Domain analysis covers hostnames, not DNS, public suffixes, browser
+  URLs, CONTEXTO or IDNA2008 registration. Ecto integration remains future work.
 
 [0.1.0]: https://github.com/ivan-podgurskiy/unicode_security/releases/tag/v0.1.0

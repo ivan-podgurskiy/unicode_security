@@ -16,10 +16,13 @@ defmodule UnicodeSecurity.Idna.LabelRules do
           | :std3
 
   @spec issues([non_neg_integer()]) :: [{atom(), non_neg_integer() | nil, rule()}]
-  def issues([]), do: []
+  def issues(scalars), do: issues(scalars, false)
 
-  def issues(scalars) do
-    nfc_issues(scalars) ++
+  @spec issues([non_neg_integer()], boolean()) :: [{atom(), non_neg_integer() | nil, rule()}]
+  def issues([], _known_nfc?), do: []
+
+  def issues(scalars, known_nfc?) do
+    if(known_nfc?, do: [], else: nfc_issues(scalars)) ++
       hyphen_issues(scalars) ++
       mark_issues(scalars) ++
       scalar_issues(scalars)

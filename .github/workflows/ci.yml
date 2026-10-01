@@ -88,3 +88,5 @@ jobs:
         run: mix run bench/milestone_2.exs
       - if: matrix.quality
         run: mix run bench/milestone_3.exs
+      - if: matrix.quality
+        run: mix run bench/milestone_4.exs

@@ -4,9 +4,9 @@ defmodule UnicodeSecurity.Collision do
 
   A collision requires at least two distinct exact binary inputs. Its class is
   the highest-precedence primary confusable class realized by a pair of
-  canonically distinct inputs, or `:none` when distinct inputs share only a
-  canonical form. Domain classes use changed Unicode labels and the strongest
-  changed-label class of each pair.
+  canonically distinct inputs. `:none` also covers different domain spellings
+  that normalize to the same IDNA name. Domain classes use changed Unicode
+  labels and the strongest changed-label class of each pair.
   """
 
   alias UnicodeSecurity.Reason

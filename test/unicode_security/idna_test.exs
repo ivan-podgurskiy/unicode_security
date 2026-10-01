@@ -9,6 +9,18 @@ defmodule UnicodeSecurity.IdnaTest do
     assert {:domain_idna_disallowed, 0, :label_separator} in LabelRules.issues([?.])
   end
 
+  test "fresh NFC labels avoid a second normalization while decoded labels still check it" do
+    assert LabelRules.issues([?a, 0x0308], false) ==
+             [{:domain_idna_disallowed, nil, :not_nfc}]
+
+    assert LabelRules.issues([0x00E4], true) == []
+
+    assert Idna.to_unicode([?a, 0x0308]) == {:ok, [0x00E4]}
+
+    assert {:error, issues} = Idna.to_unicode(String.to_charlist("xn--u-ccb"))
+    assert Enum.any?(issues, &(&1.details.rule == :not_nfc))
+  end
+
   test "nontransitional mapping and equivalent A-labels" do
     assert Idna.to_unicode(String.to_charlist("BÜCHER。example")) ==
              {:ok, String.to_charlist("bücher.example")}

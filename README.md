@@ -66,8 +66,82 @@ Nonbinary input raises `ArgumentError`. Malformed UTF-8 and oversized inputs rai
 `UnicodeSecurity.InvalidInputError` with `reason` and a zero-based `byte_offset`;
 oversized inputs report offset 4,096. Generated output may exceed 4,096 bytes.
 
-IDNA/domain handling and Ecto integration are planned later. The comparison and
-collection APIs below support the three current identifier profiles.
+Explicit `type: :domain` applies the pinned hostname pipeline described below.
+Ecto integration remains future work.
+
+## Domain and hostname checks
+
+Pass `type: :domain` explicitly; generic skeleton and comparison functions never
+guess a domain from a dot. The public adapter accepts a hostname with one optional
+final root dot. It applies pinned Unicode 18 UTS #46 revision 36 processing in
+nontransitional mode with STD3, hyphen, bidi and CONTEXTJ checks, rejecting invalid
+Punycode. The internal strict `to_ascii` conformance operation rejects a final
+root under UTS #46 VerifyDnsLength; this public hostname allowance is deliberate.
+Each non-root label must encode to 1–63 ASCII bytes and the name must fit 253
+ASCII bytes, excluding an optional root dot. Original input remains limited to
+4,096 UTF-8 bytes. The historical `18.0.0-draft` source directory contains two
+individually final IDNA files, but the overall Unicode manifest remains draft.
+
+```elixir
+result = UnicodeSecurity.check("BÜCHER.例え.", type: :domain)
+result.domain.unicode #=> "bücher.例え."
+result.domain.ascii   #=> "xn--bcher-kva.xn--r8jz45g."
+result.domain.trailing_dot? #=> true
+
+UnicodeSecurity.conflict_key("BÜCHER.a.", type: :domain) ==
+  UnicodeSecurity.conflict_key("xn--bcher-kva.a", type: :domain)
+#=> true
+
+UnicodeSecurity.compare("a", "A.", type: :domain).class
+#=> :none
+UnicodeSecurity.check("https://a", type: :domain).valid_input?
+#=> false
+```
+
+The domain Result uses `:strict` by default; `:default`, `:permissive`, and the
+existing script allow/deny options are explicit overrides. `domain.labels` preserves
+source bytes, zero-based byte/scalar spans, normalized Unicode and ASCII forms,
+and isolated security facts for each label. The root label can contain ignored
+source text. Per-label scripts, mixed-script and mixed-number checks do not combine
+unrelated labels. Whole-name flags aggregate those findings. Security policy
+changes verdict and reason severity; it does not change IDNA validity.
+
+`conflict_key/2` joins normalized label skeletons and escapes literal `%` and
+`.` inside each payload so a mapped scalar cannot masquerade as a separator.
+The key is opaque, versioned and never a display or storage replacement. U-label
+and A-label spellings, mapped case/width/separators, and the optional final root
+can share it. Domain `compare/3` reports raw original-input canonical equivalence
+separately from IDNA equivalence. Only changed normalized Unicode labels determine
+the confusable class; unchanged labels cannot turn a whole-script pair into a
+mixed-script pair. Evidence records cover whole original labels and separators,
+including removed source, with original offsets and output scalar spans.
+
+Invalid UTF-8 or input over 4,096 bytes yields one partial Result and no domain
+facts. IDNA or hostname failures yield a `DomainResult` with individual safe label
+facts, but `unicode`, `ascii` and the whole skeleton are `nil`. The reason codes
+are `domain_empty_label`, `domain_invalid_alabel`, `domain_idna_disallowed`,
+`domain_hyphen_rule`, `domain_bidi_rule`, `domain_joiner_rule`,
+`domain_label_too_long`, `domain_name_too_long`, `domain_invalid_ascii`, and
+`domain_invalid_hostname`. `domain_deviation_character` is advisory: ß and
+other deviation characters remain under nontransitional processing. Messages
+are static. Details identify the original label, offset, scalar or whole-label
+scope, triggering codepoint where one exists, and the relevant rule. Domain
+validity failures are critical/high/high under strict/default/permissive;
+deviation is medium/low/info. Other security reasons keep the policy matrix below.
+
+`conflicts?/3` validates only the visited prefix and stops at the first match;
+`conflicts/3` visits all entries and preserves duplicate matches. `audit/2` is a
+lazy stream, including dangerous results for nonbinary items. `check_many/2`
+returns unchanged item results plus exact binary duplicate and valid-key collision
+groups. An IDNA-only collision can have class `:none`; for confusable groups,
+the primary class is derived from *correlated pairs of full label vectors*, with
+mixed, whole, then single-script precedence. Its grouping work is bounded by
+O(S·D·L) for signature groups, distinct vectors and labels, plus occurrence and
+output costs. Collection findings are advisory and do not alter item verdicts.
+
+This is hostname analysis, not DNS lookup, public-suffix checking or a browser URL
+parser. It does not claim universal safety, CONTEXTO coverage, or IDNA2008
+registration conformance. Applications still decide names, ownership and storage.
 
 ## Compare names and inspect existing collections
 
@@ -100,7 +174,7 @@ one source contribution into noncontiguous spans. The aggregate class is `:none`
 `:mixed_script_confusable`. Canonical equality has class `:none`.
 
 `compare/3`, `conflict_key/2`, `conflicts?/3` and `conflicts/3` accept only the
-`type` option (`:username`, `:tenant_slug`, `:organization_name`); they do not
+`type` option (`:username`, `:tenant_slug`, `:organization_name`, `:domain`); they do not
 accept a policy preset or script overrides. The three current types use the same
 key. Invalid options fail before input validation. Inputs validate left to right;
 for existing collections the candidate validates before the enumerable. Visited
@@ -133,7 +207,7 @@ Result with the original term preserved. Producer exceptions propagate. `check_m
 eagerly consumes the enumerable and returns unchanged per-item Results plus ordered
 groups. Exact binary duplicates include invalid UTF-8 and oversized binaries;
 only valid inputs with a skeleton join collision groups. A collision requires two
-distinct original binaries; canonical-only collisions have class `:none`. A group
+distinct original binaries; canonical-only and IDNA-only collisions have class `:none`. A group
 can contain multiple classes, ordered by precedence `:mixed_script_confusable`,
 `:whole_script_confusable`, `:single_script_confusable`; its `class` is the first.
 Collection reasons carry group indexes and have preset severity critical/high/medium
@@ -164,9 +238,8 @@ UnicodeSecurity.check("раypal", type: :username, allowed_scripts: [:latin]).ve
 #=> :dangerous
 ```
 
-The required `type` is `:username`, `:tenant_slug`, or `:organization_name`.
-`:domain` raises `ArgumentError` until the dedicated IDNA/domain pipeline lands.
-Ecto integration is also planned later. Profiles have no first-character,
+The required `type` is `:username`, `:tenant_slug`, `:organization_name`, or
+`:domain`. Ecto integration is planned later. Identifier profiles have no first-character,
 case, length-in-characters, or business naming rules:
 
 | Type | Accepted syntax | Identifier_Status exceptions | Default policy |
@@ -174,6 +247,7 @@ case, length-in-characters, or business naming rules:
 | `:username` | Unicode letters L*, marks M*, decimal digits Nd; ASCII `_-.` | `_-.` | `:default` |
 | `:tenant_slug` | L*, M*, Nd; ASCII `-` | `-` | `:default` |
 | `:organization_name` | L*, M*, Nd; pinned White_Space; punctuation Pc/Pd/Ps/Pe/Pi/Pf/Po | none | `:permissive` |
+| `:domain` | Valid UTS #46 hostname with DNS length checks and one optional final root | none | `:strict` |
 
 ZWJ and ZWNJ use the normative UTS #39 revision 34 §3.1.1.1 context rules on
 internal pinned NFC, rather than generic syntax or IDNA CONTEXTJ rules. Internal
@@ -202,7 +276,7 @@ membership. Organization syntax permissions never extend status membership.
 Raw scalar diagnostic restrictions are independent of whole-string canonical
 closure. Standards primitives themselves add no profile exceptions.
 
-All three policies work with all three types. Ordered restriction levels are
+All three policies work with all four types. Ordered restriction levels are
 `:ascii`, `:single_script_restrictive`, `:highly_restrictive`,
 `:moderately_restrictive`, `:minimally_restrictive`, `:unrestricted`. Minimums are
 `:highly_restrictive` for strict, `:moderately_restrictive` for default, and
@@ -230,8 +304,9 @@ codes above, no collision or generic confusable finding. Use codes and structure
 details for logic. Messages are static, concise text, never the entire untrusted
 input, and are not a localization or parsing API.
 
-`UnicodeSecurity.Result` preserves `input`, `type`, effective preset `policy`,
-`unicode_version: "18.0.0"`, and `domain: nil`. Every binary with valid configuration
+`UnicodeSecurity.Result` preserves `input`, `type`, effective preset `policy`, and
+`unicode_version: "18.0.0"`. `domain` is present only for explicit domain checks.
+Every binary with valid configuration
 returns a Result, including malformed or oversized input. More than 4,096 original
 bytes is rejected before decoding with one critical reason at byte 4,096 and a nil
 scalar index. Invalid UTF-8 returns one critical reason at the decoder's original
@@ -239,7 +314,8 @@ byte offset and a nil scalar index. Both have `valid_input?: false` and nil
 `scripts`, `mixed_script?`, `mixed_number?`, `restriction_level`, `skeleton`.
 Empty input is valid UTF-8: `valid_input?: true`, empty scripts/skeleton, false mixed
 flags and `:ascii` level, plus a high reason at byte/scalar index zero. A false
-`valid_input?` describes decoding/size failure; policy danger does not make it false.
+`valid_input?` describes decoding, size, or domain validity failure; policy danger
+does not make it false.
 
 Scalar reasons have original zero-based byte offsets and scalar indexes, not
 normalized or grapheme positions. Global mixed and below-policy findings have nil
@@ -452,6 +528,10 @@ extracted/DerivedJoiningType.txt, and IndicSyllabicCategory.txt for pinned NFC
 composition, whitespace, bidi controls, joining types and Indic join contexts. The exact
 `BidiMirroring-18.0.0.txt` source retains an upstream comment identifying its
 carried-forward Unicode 17 repertoire; that comment has not been rewritten.
+The additional individually final `IdnaMappingTable.txt` and
+`IdnaTestV2.txt` sources drive UTS #46 revision 36 conversion and all 6,396
+conformance rows (12,792 Unicode/ASCII operations). Their raw bytes remain
+development inputs outside the Hex package. The whole manifest is still draft.
 
 Tests cover all 490,846 rows of `BidiTest.txt` in every declared paragraph
 direction and all 91,707 rows of `BidiCharacterTest.txt`, through L2. Separate
@@ -479,6 +559,7 @@ mix hex.build
 mix run bench/milestone_0.exs
 mix run bench/milestone_2.exs
 mix run bench/milestone_3.exs
+mix run bench/milestone_4.exs
 ```
 
 Milestone 2 warms each case and reports medians over 1,000 samples plus
@@ -489,6 +570,10 @@ audit prefix. Fixed inputs make runs comparable; timing thresholds are not enfor
 across machines. Milestone 2 targets a warmed
 64-byte ASCII `check/2` median below 100 µs and includes both repeated MA-mapped
 ASCII and varied profile syntax, international names and 4,096-byte worst cases.
+Milestone 4 uses five warmups and 20 samples for U/A-label conversion, contextual
+rules, DNS length boundaries and repeated/equivalent domain batches. Its
+255-scalar internationalized fixture is DNS-invalid because its encoded labels
+exceed 63 bytes; the benchmark also reports successful U/A-label conversions.
 Compile time can be measured
 with `time mix compile --force --warnings-as-errors`. Inspect the built Hex
 archive before release; it contains runtime source, generated tables, package

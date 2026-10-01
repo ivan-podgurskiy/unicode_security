@@ -297,7 +297,7 @@ defmodule UnicodeSecurity.Idna do
     scalars = Enum.map(tagged, &elem(&1, 0))
 
     label_issues =
-      LabelRules.issues(scalars)
+      LabelRules.issues(scalars, not alabel?)
       |> Enum.map(fn {code, local, rule} ->
         details =
           if is_integer(local),

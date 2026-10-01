@@ -55,6 +55,23 @@ defmodule UnicodeSecurity.MetadataTest do
       UnicodeSecurity.check(<<255>>, type: :tenant_slug)
     %{__struct__: UnicodeSecurity.Result,policy: :permissive, verdict: :suspicious} =
       UnicodeSecurity.check("Acme & Co.", type: :organization_name)
+    %{__struct__: UnicodeSecurity.Result, type: :domain, valid_input?: true,
+      domain: %{__struct__: UnicodeSecurity.DomainResult, unicode: "bücher.a.",
+        ascii: "xn--bcher-kva.a.", trailing_dot?: true,
+        labels: [%{__struct__: UnicodeSecurity.DomainLabel} | _]}} =
+      UnicodeSecurity.check("BÜCHER.a.", type: :domain)
+    %{__struct__: UnicodeSecurity.Comparison, class: :none, same_skeleton?: true} =
+      UnicodeSecurity.compare("a", "A.", type: :domain)
+    true = UnicodeSecurity.conflict_key("BÜCHER.a.", type: :domain) ==
+      UnicodeSecurity.conflict_key("xn--bcher-kva.a", type: :domain)
+    true = UnicodeSecurity.conflicts?("a", ["A."], type: :domain)
+    [%{__struct__: UnicodeSecurity.Conflict, code: :skeleton_collision}] =
+      UnicodeSecurity.conflicts("a", ["A."], type: :domain)
+    %{__struct__: UnicodeSecurity.BatchResult, collisions: [%{class: :none}], duplicates: []} =
+      UnicodeSecurity.check_many(["a", "A."], type: :domain)
+    [%{__struct__: UnicodeSecurity.BatchItem, input: nil,
+      result: %{__struct__: UnicodeSecurity.Result, valid_input?: false}}] =
+      UnicodeSecurity.audit([nil], type: :domain) |> Enum.to_list()
     %{__struct__: UnicodeSecurity.Comparison, class: :single_script_confusable,
       same_skeleton?: true, confusable?: true} = UnicodeSecurity.compare("m", "rn")
     true = UnicodeSecurity.conflicts?("m", ["rn"], type: :username)
@@ -111,10 +128,36 @@ defmodule UnicodeSecurity.MetadataTest do
             UnicodeSecurity.Data.Identifier,
             UnicodeSecurity.Data.Numbers,
             UnicodeSecurity.Data.Scripts,
-            UnicodeSecurity.Data.Confusables
+            UnicodeSecurity.Data.Confusables,
+            UnicodeSecurity.Domain,
+            UnicodeSecurity.Domain.Classes,
+            UnicodeSecurity.Domain.Comparison,
+            UnicodeSecurity.Domain.Key,
+            UnicodeSecurity.Domain.Reasons,
+            UnicodeSecurity.Domain.Source,
+            UnicodeSecurity.DomainLabel,
+            UnicodeSecurity.DomainResult,
+            UnicodeSecurity.Idna,
+            UnicodeSecurity.Idna.Bidi,
+            UnicodeSecurity.Idna.ContextJ,
+            UnicodeSecurity.Idna.LabelRules,
+            UnicodeSecurity.Idna.Punycode,
+            UnicodeSecurity.InvalidDomainError
           ] do
         Path.join(beam_directory, Atom.to_string(module) <> ".beam")
       end
+
+    source_modules =
+      Path.wildcard("lib/**/*.ex")
+      |> Enum.map(fn path ->
+        [name] =
+          Regex.run(~r/^defmodule ([\w.]+) do/m, File.read!(path), capture: :all_but_first)
+
+        "Elixir." <> name <> ".beam"
+      end)
+      |> Enum.sort()
+
+    assert Enum.sort(Enum.map(runtime_beams, &Path.basename/1)) == source_modules
 
     loader =
       Enum.map_join(runtime_beams, "\n", fn path ->

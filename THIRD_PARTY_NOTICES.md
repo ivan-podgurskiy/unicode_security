@@ -8,7 +8,7 @@ Those data and specifications are copyright Unicode, Inc. and are distributed
 under the Unicode License v3 reproduced below. The package includes derived
 normalization (including NFC composition), confusables, script, decimal-number,
 identifier-property, and profile-property tables
-and a provenance manifest for 19 locked sources. The Recommended script set is derived from UAX #31
+and a provenance manifest for 21 locked sources. The Recommended script set is derived from UAX #31
 revision 44, Table 5 (Unicode 18.0.0 proposed). Raw source files
 and the normalization conformance corpus are development inputs and are not
 included in the Hex package. Profile properties use the pinned UnicodeData.txt
@@ -17,6 +17,11 @@ Bidi_Control, extracted/DerivedJoiningType.txt Joining_Type, and
 IndicSyllabicCategory.txt Vowel_Dependent. NFC composition pairs use
 DerivedNormalizationProps.txt Full_Composition_Exclusion and UnicodeData.txt
 canonical mappings, with Hangul handled algorithmically per UAX #15 revision 58.
+The additional `IdnaMappingTable.txt` and `IdnaTestV2.txt` are pinned Unicode
+18.0.0 final source files for UTS #46 revision 36 mapping and conformance. Their
+raw data remains under the historical `18.0.0-draft` development directory and is
+excluded from Hex. The previous 19 source declarations and bytes remain intact;
+the combined manifest and release gate still report draft status.
 
 This package pins **draft Unicode 18.0.0** and targets UTS #39 revision 34.
 `UnicodeSecurity.data_manifest/0` records the precise source URLs, versions,
@@ -26,6 +31,7 @@ that Unicode, Inc. endorses the package or that the draft data is final.
 The referenced materials and license are available from:
 
 - [UTS #39 revision 34](https://www.unicode.org/reports/tr39/tr39-34.html)
+- [UTS #46 revision 36](https://www.unicode.org/reports/tr46/tr46-36.html)
 - [UAX #15 revision 58](https://www.unicode.org/reports/tr15/tr15-58.html)
 - [UAX #31 revision 44](https://www.unicode.org/reports/tr31/tr31-44.html)
 - [Unicode 18.0.0 data](https://www.unicode.org/Public/18.0.0/ucd/)
