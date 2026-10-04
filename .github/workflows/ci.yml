@@ -67,6 +67,8 @@ jobs:
       - if: matrix.quality
         run: mix run scripts/check_generated.exs
       - if: matrix.quality
+        run: mix run scripts/check_release_data.exs
+      - if: matrix.quality
         run: mix credo --strict
         env:
           MIX_ENV: dev

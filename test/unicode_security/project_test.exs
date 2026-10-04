@@ -44,6 +44,36 @@ defmodule UnicodeSecurity.ProjectTest do
     end
   end
 
+  test "publishes the final-data quality and public documentation contract" do
+    workflow = File.read!(".github/workflows/ci.yml")
+    generated_data_check =
+      "      - if: matrix.quality\n        run: mix run scripts/check_generated.exs"
+
+    release_data_check =
+      "      - if: matrix.quality\n        run: mix run scripts/check_release_data.exs"
+
+    assert String.contains?(workflow, generated_data_check)
+    assert String.contains?(workflow, release_data_check)
+
+    {generated_index, _} = :binary.match(workflow, generated_data_check)
+    {release_index, _} = :binary.match(workflow, release_data_check)
+    assert generated_index < release_index
+
+    {:docs_v1, _, _, _, module_doc, _, docs} = Code.fetch_docs(UnicodeSecurity)
+
+    assert module_doc |> doc_text() |> String.contains?("Unicode 18.0.0 data is **final**")
+
+    data_manifest_doc =
+      Enum.find_value(docs, fn
+        {{:function, :data_manifest, 0}, _, _, doc, _} -> doc_text(doc)
+        _ -> nil
+      end)
+
+    assert data_manifest_doc
+    assert data_manifest_doc =~ "final"
+    refute data_manifest_doc =~ "draft"
+  end
+
   test "exports skeleton, metadata and script detection" do
     assert Code.ensure_loaded?(UnicodeSecurity)
 
@@ -124,4 +154,7 @@ defmodule UnicodeSecurity.ProjectTest do
              "Windows checkout changed the pinned bytes of #{path}"
     end
   end
+
+  defp doc_text(%{"en" => text}), do: text
+  defp doc_text(text) when is_binary(text), do: text
 end

@@ -3,8 +3,8 @@
 Pinned Unicode normalization, confusable comparison keys, script detection, and
 identifier security properties and policy checks for Elixir.
 
-> **Development status:** Unicode 18 data is currently draft. This package is not
-> releasable until the final Unicode 18 data is published and pinned.
+> **Data status:** Unicode 18.0.0 is final. All 21 inputs are pinned to immutable,
+> versioned URLs and verified by the release-data gate.
 
 Milestone 0 is the data and normalization foundation: strict UTF-8 validation,
 pinned NFD, UTS #39 skeleton generation, and compiled source provenance. Milestone 1
@@ -30,7 +30,7 @@ UnicodeSecurity.uts39_revision()
 #=> 34
 
 UnicodeSecurity.data_manifest().release_status
-#=> :draft
+#=> :final
 ```
 
 A skeleton is a comparison key only. Never use one as a canonical identifier,
@@ -79,8 +79,8 @@ Punycode. The internal strict `to_ascii` conformance operation rejects a final
 root under UTS #46 VerifyDnsLength; this public hostname allowance is deliberate.
 Each non-root label must encode to 1–63 ASCII bytes and the name must fit 253
 ASCII bytes, excluding an optional root dot. Original input remains limited to
-4,096 UTF-8 bytes. The historical `18.0.0-draft` source directory contains two
-individually final IDNA files, but the overall Unicode manifest remains draft.
+4,096 UTF-8 bytes. All 21 final source fixtures reside in `priv/unicode/18.0.0`
+and are excluded from the Hex package.
 
 ```elixir
 result = UnicodeSecurity.check("BÜCHER.例え.", type: :domain)
@@ -508,11 +508,16 @@ Mixed numbers do not change the restriction level; use their separate predicate.
 
 ## Data and development
 
-Unicode 18.0.0 / UTS #39 revision 34 is pinned as **draft**. The embedded manifest
-records each logical source name, URL, version, status, byte count, and SHA-256.
-Do not promote a data status or update a hash to silence a verification failure.
-An upstream draft change requires a deliberate source update and regeneration.
-Persisted keys must retain their Unicode version and be reviewed when data changes.
+Unicode 18.0.0 is final. The embedded manifest records all 21 logical source names,
+immutable versioned URLs, versions, statuses, byte counts, and SHA-256 digests. The
+data implements UTS #39 revision 34 and UTS #46 revision 36. Do not update a hash
+to silence a verification failure. Persisted keys must retain their Unicode version
+and be reviewed when data changes.
+
+Finalization changed only an upstream `BidiMirroring.txt` comment and generated
+provenance. Public behavior and conflict keys did not change, so M5A requires no
+conflict-key backfill. A future Unicode data-version change must regenerate
+conflict keys, review collisions, and migrate application-owned indexes before use.
 
 From a source checkout:
 
@@ -526,6 +531,7 @@ mix run scripts/fetch_unicode_data.exs
 git diff --exit-code -- priv/unicode/sources.lock
 mix run scripts/generate_unicode_data.exs
 mix run scripts/check_generated.exs
+mix run scripts/check_release_data.exs
 ```
 
 Source fixtures are vendored for offline verification on a fresh checkout.
@@ -536,9 +542,9 @@ match its byte sizes and hashes before installation, and the lock is preserved.
 Initial lock creation requires `--create-lock`; deliberate upstream updates
 require `--update-lock`, followed by review and regeneration. Generation, conformance,
 and reproducibility checks run offline. Raw files stay tracked under
-`priv/unicode/18.0.0-draft` for these checks and are excluded from Hex.
+`priv/unicode/18.0.0` for these checks and are excluded from Hex.
 
-Identifier properties come from the pinned draft `IdentifierStatus.txt` and
+Identifier properties come from the final `IdentifierStatus.txt` and
 `IdentifierType.txt` files. The bidi inputs are `extracted/DerivedBidiClass.txt` (including unassigned-code-point
 defaults), `BidiBrackets.txt`, `BidiMirroring.txt`, and `DerivedCoreProperties.txt`.
 The existing `UnicodeData.txt` also supplies nonspacing/enclosing mark categories.
@@ -546,12 +552,11 @@ All have versioned Unicode 18.0.0 UCD URLs in the manifest. The 19 locked source
 also include DerivedNormalizationProps.txt, PropList.txt,
 extracted/DerivedJoiningType.txt, and IndicSyllabicCategory.txt for pinned NFC
 composition, whitespace, bidi controls, joining types and Indic join contexts. The exact
-`BidiMirroring-18.0.0.txt` source retains an upstream comment identifying its
-carried-forward Unicode 17 repertoire; that comment has not been rewritten.
-The additional individually final `IdnaMappingTable.txt` and
-`IdnaTestV2.txt` sources drive UTS #46 revision 36 conversion and all 6,396
-conformance rows (12,792 Unicode/ASCII operations). Their raw bytes remain
-development inputs outside the Hex package. The whole manifest is still draft.
+`BidiMirroring-18.0.0.txt` source changed only an upstream comment identifying its
+carried-forward Unicode 17 repertoire during finalization. The final
+`IdnaMappingTable.txt` and `IdnaTestV2.txt` sources drive UTS #46 revision 36
+conversion and all 6,396 conformance rows (12,792 Unicode/ASCII operations).
+Their raw bytes remain development inputs outside the Hex package.
 
 Tests cover all 490,846 rows of `BidiTest.txt` in every declared paragraph
 direction and all 91,707 rows of `BidiCharacterTest.txt`, through L2. Separate
@@ -572,6 +577,7 @@ mix test --warnings-as-errors
 mix test --cover --warnings-as-errors
 mix format --check-formatted
 mix run scripts/check_generated.exs
+mix run scripts/check_release_data.exs
 mix credo --strict
 mix dialyzer --format github
 mix docs --warnings-as-errors
@@ -601,21 +607,18 @@ configuration, and public documentation, with a target below 5 MB unpacked.
 
 ## Publication readiness
 
-`mix hex.build` is allowed for local inspection while data is draft. It does not
-certify publication readiness. Before any publication, maintainers must run:
+`mix hex.build` is available for local inspection but does not certify publication
+readiness. Before any publication, maintainers must run:
 
 ```sh
-# Release-workflow prerequisite: run manually before publication.
 mix run scripts/check_release_data.exs
 ```
 
-<!-- A future release workflow must run scripts/check_release_data.exs before
-publication. Do not run this intentional draft-data failure in ordinary CI.
-This development milestone has no publish workflow and must not be tagged or published. -->
-
-The release check first verifies generated data, then exits with
-`release blocked: Unicode 18.0.0 data status is draft`. It must continue to fail
-until a coordinated update pins final data. This milestone is not published.
+The release check first verifies generated data, then validates the final source
+declarations; it is expected to pass. The quality job runs it immediately after
+generated-data verification. This change defines that check for the next hosted
+run; M5A does not claim hosted CI execution, Ecto integration, fuzzing,
+publication dry runs, or release publication.
 
 ## License
 

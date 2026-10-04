@@ -8,8 +8,8 @@ defmodule UnicodeSecurity do
   identifier, replacement value, or authorization decision. Matching keys do not
   establish identity or intent.
 
-  Unicode 18.0.0 data is **draft**, so this milestone is not ready for publication.
-  See `data_manifest/0` for pinned source hashes and status. Runtime calls use only
+  Unicode 18.0.0 data is **final**. See `data_manifest/0` for pinned source hashes
+  and final status. Runtime calls use only
   compiled data, with no file or network access or application processes.
   """
 
@@ -116,7 +116,7 @@ defmodule UnicodeSecurity do
   @spec check_many(Enumerable.t(), keyword()) :: UnicodeSecurity.BatchResult.t()
   defdelegate check_many(enumerable, options), to: UnicodeSecurity.Batch
 
-  @doc "Returns the Unicode version used by the compiled data; see `data_manifest/0` for draft status."
+  @doc "Returns the Unicode version used by the compiled final data; see `data_manifest/0` for provenance."
   @spec unicode_version() :: binary()
   def unicode_version, do: "18.0.0"
 
@@ -128,8 +128,8 @@ defmodule UnicodeSecurity do
   Returns the provenance of the compiled Unicode data.
 
   The manifest includes the release status and each source's logical filename,
-  URL, version, byte size, SHA-256 digest, and status. Unicode 18.0.0 sources are
-  currently draft data, which prevents publication. This function performs no
+  URL, version, byte size, SHA-256 digest, and status. All 21 Unicode 18.0.0
+  sources are final. This function performs no
   file or network access.
   """
   @spec data_manifest() :: map()
@@ -140,7 +140,7 @@ defmodule UnicodeSecurity do
 
   The result is a comparison key only; do not use it as a canonical identifier,
   display value, replacement for the original input, or authorization decision.
-  This milestone uses draft data and is not ready for publication.
+  This milestone uses final Unicode 18.0.0 data.
 
   UTS #39 revision 34 defines this as `bidiSkeleton(LTR, input)`. It first applies
   the pinned Unicode Bidirectional Algorithm in isolation at paragraph level 0,

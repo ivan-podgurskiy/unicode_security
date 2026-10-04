@@ -9,7 +9,7 @@ under the Unicode License v3 reproduced below. The package includes derived
 normalization (including NFC composition), confusables, script, decimal-number,
 identifier-property, and profile-property tables
 and a provenance manifest for 21 locked sources. The Recommended script set is derived from UAX #31
-revision 44, Table 5 (Unicode 18.0.0 proposed). Raw source files
+revision 44, Table 5 (Unicode 18.0.0). Raw source files
 and the normalization conformance corpus are development inputs and are not
 included in the Hex package. Profile properties use the pinned UnicodeData.txt
 General_Category (including First/Last ranges), PropList.txt White_Space and
@@ -17,16 +17,14 @@ Bidi_Control, extracted/DerivedJoiningType.txt Joining_Type, and
 IndicSyllabicCategory.txt Vowel_Dependent. NFC composition pairs use
 DerivedNormalizationProps.txt Full_Composition_Exclusion and UnicodeData.txt
 canonical mappings, with Hangul handled algorithmically per UAX #15 revision 58.
-The additional `IdnaMappingTable.txt` and `IdnaTestV2.txt` are pinned Unicode
-18.0.0 final source files for UTS #46 revision 36 mapping and conformance. Their
-raw data remains under the historical `18.0.0-draft` development directory and is
-excluded from Hex. The previous 19 source declarations and bytes remain intact;
-the combined manifest and release gate still report draft status.
+The final `IdnaMappingTable.txt` and `IdnaTestV2.txt` source files provide UTS #46
+revision 36 mapping and conformance. All 21 final source files are kept under
+`priv/unicode/18.0.0` for development verification and are excluded from Hex.
 
-This package pins **draft Unicode 18.0.0** and targets UTS #39 revision 34.
+This package pins **final Unicode 18.0.0** and targets UTS #39 revision 34.
 `UnicodeSecurity.data_manifest/0` records the precise source URLs, versions,
-draft statuses, byte sizes, and SHA-256 hashes. This attribution does not imply
-that Unicode, Inc. endorses the package or that the draft data is final.
+final statuses, byte sizes, and SHA-256 hashes. This attribution does not imply
+that Unicode, Inc. endorses the package.
 
 The referenced materials and license are available from:
 
@@ -35,7 +33,6 @@ The referenced materials and license are available from:
 - [UAX #15 revision 58](https://www.unicode.org/reports/tr15/tr15-58.html)
 - [UAX #31 revision 44](https://www.unicode.org/reports/tr31/tr31-44.html)
 - [Unicode 18.0.0 data](https://www.unicode.org/Public/18.0.0/ucd/)
-- [Draft security data](https://www.unicode.org/Public/draft/security/)
 - [Unicode License v3](https://www.unicode.org/license.txt)
 
 ## Unicode License v3
