@@ -87,33 +87,39 @@ defmodule UnicodeSecurity.SourceTest do
     end
   end
 
-  test "declares exactly four additional official draft Unicode 18 profile sources" do
+  test "declares and verifies the complete final Unicode 18 source set" do
     sources = Source.sources()
+    assert Source.directory("/repo") == "/repo/priv/unicode/18.0.0"
     assert length(sources) == 21
-    assert Enum.count(sources, &(&1.status == :draft)) == 19
-    assert Enum.count(sources, &(&1.status == :final)) == 2
+    assert Enum.all?(sources, &(&1.version == "18.0.0" and &1.status == :final))
+    refute Enum.any?(sources, &String.contains?(&1.url, "/draft/"))
+    refute Enum.any?(sources, &String.contains?(&1.url, "/latest/"))
 
-    for name <- ["IdnaMappingTable.txt", "IdnaTestV2.txt"] do
-      assert %{url: url, version: "18.0.0", status: :final} =
-               Enum.find(sources, &(&1.name == name))
+    for source <- sources do
+      expected_url =
+        cond do
+          source.name in ["IdentifierStatus.txt", "IdentifierType.txt", "confusables.txt"] ->
+            "https://www.unicode.org/Public/18.0.0/security/" <> source.name
 
-      assert url == "https://www.unicode.org/Public/18.0.0/idna/" <> name
-    end
+          source.name in ["IdnaMappingTable.txt", "IdnaTestV2.txt"] ->
+            "https://www.unicode.org/Public/18.0.0/idna/" <> source.name
 
-    for {name, suffix} <- [
-          {"DerivedNormalizationProps.txt", "DerivedNormalizationProps.txt"},
-          {"PropList.txt", "PropList.txt"},
-          {"DerivedJoiningType.txt", "extracted/DerivedJoiningType.txt"},
-          {"IndicSyllabicCategory.txt", "IndicSyllabicCategory.txt"}
-        ] do
-      assert %{url: url, version: "18.0.0", status: :draft} =
-               Enum.find(sources, &(&1.name == name))
+          source.name in [
+            "DerivedJoiningType.txt",
+            "DerivedCombiningClass.txt",
+            "DerivedBidiClass.txt"
+          ] ->
+            "https://www.unicode.org/Public/18.0.0/ucd/extracted/" <> source.name
 
-      assert url == "https://www.unicode.org/Public/18.0.0/ucd/" <> suffix
+          true ->
+            "https://www.unicode.org/Public/18.0.0/ucd/" <> source.name
+        end
+
+      assert source.url == expected_url
     end
 
     {lock, []} = Code.eval_file("priv/unicode/sources.lock")
-    assert Source.verify!(sources, "priv/unicode/18.0.0-draft", lock) == :ok
+    assert Source.verify!(Source.sources(), Source.directory(File.cwd!()), lock) == :ok
   end
 
   test "locks and verifies source bytes" do

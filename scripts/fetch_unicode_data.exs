@@ -4,7 +4,7 @@ alias UnicodeSecurity.UnicodeData.Source
 {:ok, _applications} = Application.ensure_all_started(:ssl)
 
 project_root = Path.expand("..", __DIR__)
-directory = Path.join(project_root, "priv/unicode/18.0.0-draft")
+directory = Source.directory(project_root)
 lock_path = Path.join(project_root, "priv/unicode/sources.lock")
 sources = Source.sources()
 

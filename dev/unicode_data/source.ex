@@ -2,121 +2,122 @@ defmodule UnicodeSecurity.UnicodeData.Source do
   @moduledoc false
 
   @unicode_version "18.0.0"
+  @source_directory "18.0.0"
 
   @sources [
     %{
       name: "DerivedNormalizationProps.txt",
       url: "https://www.unicode.org/Public/18.0.0/ucd/DerivedNormalizationProps.txt",
       version: "18.0.0",
-      status: :draft
+      status: :final
     },
     %{
       name: "PropList.txt",
       url: "https://www.unicode.org/Public/18.0.0/ucd/PropList.txt",
       version: "18.0.0",
-      status: :draft
+      status: :final
     },
     %{
       name: "DerivedJoiningType.txt",
       url: "https://www.unicode.org/Public/18.0.0/ucd/extracted/DerivedJoiningType.txt",
       version: "18.0.0",
-      status: :draft
+      status: :final
     },
     %{
       name: "IndicSyllabicCategory.txt",
       url: "https://www.unicode.org/Public/18.0.0/ucd/IndicSyllabicCategory.txt",
       version: "18.0.0",
-      status: :draft
+      status: :final
     },
     %{
       name: "IdentifierStatus.txt",
-      url: "https://www.unicode.org/Public/draft/security/IdentifierStatus.txt",
+      url: "https://www.unicode.org/Public/18.0.0/security/IdentifierStatus.txt",
       version: "18.0.0",
-      status: :draft
+      status: :final
     },
     %{
       name: "IdentifierType.txt",
-      url: "https://www.unicode.org/Public/draft/security/IdentifierType.txt",
+      url: "https://www.unicode.org/Public/18.0.0/security/IdentifierType.txt",
       version: "18.0.0",
-      status: :draft
+      status: :final
     },
     %{
       name: "Scripts.txt",
       url: "https://www.unicode.org/Public/18.0.0/ucd/Scripts.txt",
       version: "18.0.0",
-      status: :draft
+      status: :final
     },
     %{
       name: "ScriptExtensions.txt",
       url: "https://www.unicode.org/Public/18.0.0/ucd/ScriptExtensions.txt",
       version: "18.0.0",
-      status: :draft
+      status: :final
     },
     %{
       name: "PropertyValueAliases.txt",
       url: "https://www.unicode.org/Public/18.0.0/ucd/PropertyValueAliases.txt",
       version: "18.0.0",
-      status: :draft
+      status: :final
     },
     %{
       name: "UnicodeData.txt",
       url: "https://www.unicode.org/Public/18.0.0/ucd/UnicodeData.txt",
       version: "18.0.0",
-      status: :draft
+      status: :final
     },
     %{
       name: "DerivedCombiningClass.txt",
       url: "https://www.unicode.org/Public/18.0.0/ucd/extracted/DerivedCombiningClass.txt",
       version: "18.0.0",
-      status: :draft
+      status: :final
     },
     %{
       name: "NormalizationTest.txt",
       url: "https://www.unicode.org/Public/18.0.0/ucd/NormalizationTest.txt",
       version: "18.0.0",
-      status: :draft
+      status: :final
     },
     %{
       name: "confusables.txt",
-      url: "https://www.unicode.org/Public/draft/security/confusables.txt",
+      url: "https://www.unicode.org/Public/18.0.0/security/confusables.txt",
       version: "18.0.0",
-      status: :draft
+      status: :final
     },
     %{
       name: "DerivedCoreProperties.txt",
       url: "https://www.unicode.org/Public/18.0.0/ucd/DerivedCoreProperties.txt",
       version: "18.0.0",
-      status: :draft
+      status: :final
     },
     %{
       name: "DerivedBidiClass.txt",
       url: "https://www.unicode.org/Public/18.0.0/ucd/extracted/DerivedBidiClass.txt",
       version: "18.0.0",
-      status: :draft
+      status: :final
     },
     %{
       name: "BidiBrackets.txt",
       url: "https://www.unicode.org/Public/18.0.0/ucd/BidiBrackets.txt",
       version: "18.0.0",
-      status: :draft
+      status: :final
     },
     %{
       name: "BidiMirroring.txt",
       url: "https://www.unicode.org/Public/18.0.0/ucd/BidiMirroring.txt",
       version: "18.0.0",
-      status: :draft
+      status: :final
     },
     %{
       name: "BidiTest.txt",
       url: "https://www.unicode.org/Public/18.0.0/ucd/BidiTest.txt",
       version: "18.0.0",
-      status: :draft
+      status: :final
     },
     %{
       name: "BidiCharacterTest.txt",
       url: "https://www.unicode.org/Public/18.0.0/ucd/BidiCharacterTest.txt",
       version: "18.0.0",
-      status: :draft
+      status: :final
     },
     %{
       name: "IdnaMappingTable.txt",
@@ -134,6 +135,11 @@ defmodule UnicodeSecurity.UnicodeData.Source do
 
   @spec sources() :: [map()]
   def sources, do: @sources
+
+  @spec directory(Path.t()) :: Path.t()
+  def directory(project_root) do
+    Path.join([project_root, "priv", "unicode", @source_directory])
+  end
 
   @spec fetch!([map()], Path.t(), :locked | :update_lock) :: map()
   def fetch!(declarations, directory, mode \\ :locked) when mode in [:locked, :update_lock] do
