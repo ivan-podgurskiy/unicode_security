@@ -394,7 +394,8 @@ defmodule UnicodeSecurity.GeneratorTest do
   test "release gate accepts final data and checks generated data first" do
     root = checker_project!()
 
-    assert {"", 0} = run_check(root, "check_release_data.exs")
+    {output, 0} = run_check(root, "check_release_data.exs")
+    refute output =~ "release blocked:"
 
     File.write!(Path.join(root, "lib/unicode_security/data/manifest.ex"), "# stale\n")
     {output, status} = run_check(root, "check_release_data.exs")

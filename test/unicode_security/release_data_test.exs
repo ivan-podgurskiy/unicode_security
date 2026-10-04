@@ -1,6 +1,30 @@
 defmodule UnicodeSecurity.ReleaseDataTest do
   use ExUnit.Case, async: true
 
+  alias UnicodeSecurity.UnicodeData.Release
+
+  # Breaks: accepting a release when every declared source is final.
+  test "finds no non-final names in final source declarations" do
+    final_sources = [
+      %{name: "b.txt", status: :final},
+      %{name: "a.txt", status: :final}
+    ]
+
+    assert Release.non_final_source_names(final_sources) == []
+  end
+
+  # Breaks: accepting a non-final declaration or producing names in declaration order.
+  test "returns sorted names for non-final source declarations" do
+    draft_b = %{name: "b.txt", status: :draft}
+    final = %{name: "final.txt", status: :final}
+    draft_a = %{name: "a.txt", status: :draft}
+
+    assert Release.non_final_source_names([draft_b, final, draft_a]) == ["a.txt", "b.txt"]
+    assert Release.non_final_source_names([%{name: "candidate.txt", status: :candidate}]) == [
+             "candidate.txt"
+           ]
+  end
+
   test "records the final Unicode 18 source transition and its single comment-only delta" do
     {report, []} = Code.eval_file("priv/unicode/18.0.0-release.term")
     {lock, []} = Code.eval_file("priv/unicode/sources.lock")
