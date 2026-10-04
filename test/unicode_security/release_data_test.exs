@@ -20,6 +20,7 @@ defmodule UnicodeSecurity.ReleaseDataTest do
     draft_a = %{name: "a.txt", status: :draft}
 
     assert Release.non_final_source_names([draft_b, final, draft_a]) == ["a.txt", "b.txt"]
+
     assert Release.non_final_source_names([%{name: "candidate.txt", status: :candidate}]) == [
              "candidate.txt"
            ]

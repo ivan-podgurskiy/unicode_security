@@ -46,6 +46,7 @@ defmodule UnicodeSecurity.ProjectTest do
 
   test "publishes the final-data quality and public documentation contract" do
     workflow = File.read!(".github/workflows/ci.yml")
+
     generated_data_check =
       "      - if: matrix.quality\n        run: mix run scripts/check_generated.exs"
 
