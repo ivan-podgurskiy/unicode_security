@@ -6,6 +6,7 @@ defmodule UnicodeSecurity.ScriptsTest do
   alias UnicodeSecurity.Scripts
   alias UnicodeSecurity.Test.ElixirRunner
   alias UnicodeSecurity.UnicodeData.ScriptParser
+  alias UnicodeSecurity.UnicodeData.Source
 
   @aliases "# PropertyValueAliases-18.0.0.txt\nsc ; Latn ; Latin\nsc ; Cyrl ; Cyrillic\nsc ; Zzzz ; Unknown\nsc ; Zinh ; Inherited ; Qaai\n"
   @scripts "# Scripts-18.0.0.txt\n# @missing: 0000..10FFFF; Unknown\n"
@@ -220,7 +221,7 @@ defmodule UnicodeSecurity.ScriptsTest do
   end
 
   defp reference_lines(name) do
-    Path.join("priv/unicode/18.0.0-draft", name)
+    Path.join(Source.directory(File.cwd!()), name)
     |> File.stream!()
     |> Stream.map(fn line -> line |> String.split("#", parts: 2) |> hd() |> String.trim() end)
     |> Stream.reject(&(&1 == ""))

@@ -1,10 +1,11 @@
 defmodule UnicodeSecurity.Test.UnicodeFixtures do
   @moduledoc false
 
-  @normalization_path Path.expand(
-                        "../../priv/unicode/18.0.0-draft/NormalizationTest.txt",
-                        __DIR__
-                      )
+  alias UnicodeSecurity.UnicodeData.Source
+
+  @project_root Path.expand("../..", __DIR__)
+  @directory Source.directory(@project_root)
+  @normalization_path Path.join(@directory, "NormalizationTest.txt")
 
   def normalization_rows do
     @normalization_path
@@ -21,7 +22,7 @@ defmodule UnicodeSecurity.Test.UnicodeFixtures do
   end
 
   def confusable_rows do
-    Path.expand("../../priv/unicode/18.0.0-draft/confusables.txt", __DIR__)
+    Path.join(@directory, "confusables.txt")
     |> File.stream!()
     |> Stream.with_index(1)
     |> Stream.map(fn {line, number} ->

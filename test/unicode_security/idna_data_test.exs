@@ -2,6 +2,7 @@ defmodule UnicodeSecurity.IdnaDataTest do
   use ExUnit.Case, async: true
 
   alias UnicodeSecurity.Data.Idna
+  alias UnicodeSecurity.UnicodeData.Source
 
   test "nontransitional payloads remain distinguishable" do
     assert Idna.lookup(?A) == {:mapped, [?a]}
@@ -59,7 +60,8 @@ defmodule UnicodeSecurity.IdnaDataTest do
       "disallowed" => :disallowed
     }
 
-    "priv/unicode/18.0.0-draft/IdnaMappingTable.txt"
+    Source.directory(File.cwd!())
+    |> Path.join("IdnaMappingTable.txt")
     |> File.read!()
     |> String.split("\n")
     |> Enum.flat_map(fn line ->

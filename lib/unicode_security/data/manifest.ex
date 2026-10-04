@@ -4,7 +4,7 @@ defmodule UnicodeSecurity.Data.Manifest do
   @spec get() :: map()
   def get,
     do: %{
-      release_status: :draft,
+      release_status: :final,
       sources: [
         %{
           name: "BidiBrackets.txt",
@@ -12,7 +12,7 @@ defmodule UnicodeSecurity.Data.Manifest do
           version: "18.0.0",
           bytes: 8_992,
           sha256: "4b3b62e4a14b84ee752808c810c602534921c09a4a1bf78cfbee566d66c125b3",
-          status: :draft
+          status: :final
         },
         %{
           name: "BidiCharacterTest.txt",
@@ -20,15 +20,15 @@ defmodule UnicodeSecurity.Data.Manifest do
           version: "18.0.0",
           bytes: 6_880_771,
           sha256: "045b24d2c8ab066951bd32fe8c6b4de34647f72b5b1c7df0265f24ab53573e01",
-          status: :draft
+          status: :final
         },
         %{
           name: "BidiMirroring.txt",
           url: "https://www.unicode.org/Public/18.0.0/ucd/BidiMirroring.txt",
           version: "18.0.0",
-          bytes: 27_352,
-          sha256: "cd47918b28b73c3be37d730d0f48ab11e862afef9eb11d85ad832be9fb6c7f8f",
-          status: :draft
+          bytes: 27_294,
+          sha256: "cd54810ebf52f0e61a730c8b9cb25975de6c85f6d788a559b416afd548923fd6",
+          status: :final
         },
         %{
           name: "BidiTest.txt",
@@ -36,7 +36,7 @@ defmodule UnicodeSecurity.Data.Manifest do
           version: "18.0.0",
           bytes: 7_959_988,
           sha256: "9af2f882a4ab50912e388f069a673b94eacd82fa6d07d20a3ff7f3c759e905aa",
-          status: :draft
+          status: :final
         },
         %{
           name: "DerivedBidiClass.txt",
@@ -44,7 +44,7 @@ defmodule UnicodeSecurity.Data.Manifest do
           version: "18.0.0",
           bytes: 176_412,
           sha256: "d9e23222522551348ea1ccfbb4f62efbf98982afb95840f8959c08ed992c5607",
-          status: :draft
+          status: :final
         },
         %{
           name: "DerivedCombiningClass.txt",
@@ -52,7 +52,7 @@ defmodule UnicodeSecurity.Data.Manifest do
           version: "18.0.0",
           bytes: 186_280,
           sha256: "ef6b2611cfb660dba3f6b458b9eb4b05f44ed2417302ee7749d7f0f348793121",
-          status: :draft
+          status: :final
         },
         %{
           name: "DerivedCoreProperties.txt",
@@ -60,7 +60,7 @@ defmodule UnicodeSecurity.Data.Manifest do
           version: "18.0.0",
           bytes: 1_159_889,
           sha256: "09c928886a178fcafd93c29e4bd59073a058e5a100b716d425cb563ab50f68c9",
-          status: :draft
+          status: :final
         },
         %{
           name: "DerivedJoiningType.txt",
@@ -68,7 +68,7 @@ defmodule UnicodeSecurity.Data.Manifest do
           version: "18.0.0",
           bytes: 41_024,
           sha256: "e2408ff2c92b175b0f7bf62c989bbb54c7b077528fe31f8d69b96fa09e7d61ed",
-          status: :draft
+          status: :final
         },
         %{
           name: "DerivedNormalizationProps.txt",
@@ -76,23 +76,23 @@ defmodule UnicodeSecurity.Data.Manifest do
           version: "18.0.0",
           bytes: 1_396_877,
           sha256: "98ac7f67d985fe781e317f6182e885e94cabb0c314769e6dd73e48b226931ccd",
-          status: :draft
+          status: :final
         },
         %{
           name: "IdentifierStatus.txt",
-          url: "https://www.unicode.org/Public/draft/security/IdentifierStatus.txt",
+          url: "https://www.unicode.org/Public/18.0.0/security/IdentifierStatus.txt",
           version: "18.0.0",
           bytes: 148_042,
           sha256: "5863c7d99ca18f213c41c7318aa5528bebfb6d32ec0f1d5944e37192c119aebd",
-          status: :draft
+          status: :final
         },
         %{
           name: "IdentifierType.txt",
-          url: "https://www.unicode.org/Public/draft/security/IdentifierType.txt",
+          url: "https://www.unicode.org/Public/18.0.0/security/IdentifierType.txt",
           version: "18.0.0",
           bytes: 534_017,
           sha256: "fa24851acc669e58670e354e7b98a4ec8f52a809ec4f80524b6a60efdb868831",
-          status: :draft
+          status: :final
         },
         %{
           name: "IdnaMappingTable.txt",
@@ -116,7 +116,7 @@ defmodule UnicodeSecurity.Data.Manifest do
           version: "18.0.0",
           bytes: 86_842,
           sha256: "a2b3aacf6b3e7bad4ca351ef985d9543825e20280ff280c25f646d9bc4ce304c",
-          status: :draft
+          status: :final
         },
         %{
           name: "NormalizationTest.txt",
@@ -124,7 +124,7 @@ defmodule UnicodeSecurity.Data.Manifest do
           version: "18.0.0",
           bytes: 2_863_708,
           sha256: "25a50d816764b04abfb4a646d3eb2b2a803284c3873d9a06757b94fe4513dde3",
-          status: :draft
+          status: :final
         },
         %{
           name: "PropList.txt",
@@ -132,7 +132,7 @@ defmodule UnicodeSecurity.Data.Manifest do
           version: "18.0.0",
           bytes: 149_040,
           sha256: "f438f532e8737bb8a2702126cdf9c4af5e357c58c7acf9d9eb2fc7c1a1d955d6",
-          status: :draft
+          status: :final
         },
         %{
           name: "PropertyValueAliases.txt",
@@ -140,7 +140,7 @@ defmodule UnicodeSecurity.Data.Manifest do
           version: "18.0.0",
           bytes: 83_536,
           sha256: "06c4c8eaf7b0bf34abe73b113da1215bd784ac254d4c223600b90267caa4bbbd",
-          status: :draft
+          status: :final
         },
         %{
           name: "ScriptExtensions.txt",
@@ -148,7 +148,7 @@ defmodule UnicodeSecurity.Data.Manifest do
           version: "18.0.0",
           bytes: 21_145,
           sha256: "5c9d34a922f687726f2a8bcf57d49f905987e51f1b21b58c95a00fbe255cec23",
-          status: :draft
+          status: :final
         },
         %{
           name: "Scripts.txt",
@@ -156,7 +156,7 @@ defmodule UnicodeSecurity.Data.Manifest do
           version: "18.0.0",
           bytes: 196_089,
           sha256: "0071fd81b6aeae25f6e8bce8efec3066a6476a91b49bdb2f52dc76e817862a6a",
-          status: :draft
+          status: :final
         },
         %{
           name: "UnicodeData.txt",
@@ -164,15 +164,15 @@ defmodule UnicodeSecurity.Data.Manifest do
           version: "18.0.0",
           bytes: 2_243_593,
           sha256: "0736451de439ae7baf1425136617da495e09ee5afbe6e394374db7009ea08950",
-          status: :draft
+          status: :final
         },
         %{
           name: "confusables.txt",
-          url: "https://www.unicode.org/Public/draft/security/confusables.txt",
+          url: "https://www.unicode.org/Public/18.0.0/security/confusables.txt",
           version: "18.0.0",
           bytes: 763_128,
           sha256: "6ed3ee967c9dfdf6677d563c9985182fbc50a2efb7d6059cd57b2e2ce18f5b92",
-          status: :draft
+          status: :final
         }
       ]
     }

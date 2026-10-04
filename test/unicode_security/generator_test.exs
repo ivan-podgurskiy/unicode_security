@@ -8,9 +8,35 @@ defmodule UnicodeSecurity.GeneratorTest do
   alias UnicodeSecurity.UnicodeData.IdnaGenerator
   alias UnicodeSecurity.UnicodeData.Source
 
+  test "two complete generations from final sources produce identical bytes" do
+    source_directory = Source.directory(File.cwd!())
+    root = temporary_directory()
+
+    generators = [
+      {"manifest.ex", &Generator.generate_manifest!/2},
+      {"normalization.ex", &Generator.generate!/2},
+      {"confusables.ex", &Generator.generate_confusables!/2},
+      {"bidi.ex", &Generator.generate_bidi!/2},
+      {"scripts.ex", &Generator.generate_scripts!/2},
+      {"identifier.ex", &Generator.generate_identifier!/2},
+      {"numbers.ex", &Generator.generate_numbers!/2},
+      {"profile.ex", &Generator.generate_profile!/2},
+      {"composition.ex", &Generator.generate_composition!/2},
+      {"idna.ex", &Generator.generate_idna!/2}
+    ]
+
+    for {name, generate} <- generators do
+      first = generate.(source_directory, Path.join(root, "first"))
+      second = generate.(source_directory, Path.join(root, "second"))
+      assert Path.basename(first) == name
+      assert Path.basename(second) == name
+      assert File.read!(first) == File.read!(second), "generation differed for #{name}"
+    end
+  end
+
   test "reproduces IDNA data deterministically and validates all sources before writing" do
-    first = Generator.generate_idna!("priv/unicode/18.0.0-draft", temporary_directory())
-    second = Generator.generate_idna!("priv/unicode/18.0.0-draft", temporary_directory())
+    first = Generator.generate_idna!(Source.directory(File.cwd!()), temporary_directory())
+    second = Generator.generate_idna!(Source.directory(File.cwd!()), temporary_directory())
     assert File.read!(first) == File.read!(second)
     assert File.read!(first) == File.read!("lib/unicode_security/data/idna.ex")
 
@@ -52,7 +78,7 @@ defmodule UnicodeSecurity.GeneratorTest do
   end
 
   test "reproduces the complete locked identifier corpus including canonical rescue data" do
-    output = Generator.generate_identifier!("priv/unicode/18.0.0-draft", temporary_directory())
+    output = Generator.generate_identifier!(Source.directory(File.cwd!()), temporary_directory())
     assert File.read!(output) == File.read!("lib/unicode_security/data/identifier.ex")
   end
 
@@ -61,7 +87,7 @@ defmodule UnicodeSecurity.GeneratorTest do
           {&Generator.generate_profile!/2, "profile.ex"},
           {&Generator.generate_composition!/2, "composition.ex"}
         ] do
-      path = generate.("priv/unicode/18.0.0-draft", temporary_directory())
+      path = generate.(Source.directory(File.cwd!()), temporary_directory())
       assert File.read!(path) == File.read!("lib/unicode_security/data/#{name}")
       root = temporary_directory()
       sources = write_sources!(root)
@@ -249,7 +275,7 @@ defmodule UnicodeSecurity.GeneratorTest do
     {lock, []} = Code.eval_file(Path.join(root, "sources.lock"))
 
     expected = %{
-      release_status: :draft,
+      release_status: :final,
       sources:
         Source.sources()
         |> Enum.sort_by(& &1.name)
@@ -336,7 +362,7 @@ defmodule UnicodeSecurity.GeneratorTest do
     invocation = "Mix.start()\nCode.require_file(#{inspect(script)})\n"
 
     for source <- Source.sources() do
-      source_path = Path.join(root, "priv/unicode/18.0.0-draft/#{source.name}")
+      source_path = Path.join(Source.directory(root), source.name)
       original_source = File.read!(source_path)
       File.write!(source_path, original_source <> "# tampered\n")
 
@@ -358,18 +384,17 @@ defmodule UnicodeSecurity.GeneratorTest do
 
   test "offline checker verifies all locked sources before accepting generated files" do
     root = checker_project!()
-    File.write!(Path.join(root, "priv/unicode/18.0.0-draft/NormalizationTest.txt"), "tampered\n")
+    File.write!(Path.join(Source.directory(root), "NormalizationTest.txt"), "tampered\n")
 
     {output, status} = run_check(root, "check_generated.exs")
     assert status != 0
     assert output =~ "byte-size mismatch for NormalizationTest.txt"
   end
 
-  test "release gate reports the intentional draft block and checks generated data first" do
+  test "release gate accepts final data and checks generated data first" do
     root = checker_project!()
 
-    assert {"release blocked: Unicode 18.0.0 data status is draft\n", 1} =
-             run_check(root, "check_release_data.exs")
+    assert {"", 0} = run_check(root, "check_release_data.exs")
 
     File.write!(Path.join(root, "lib/unicode_security/data/manifest.ex"), "# stale\n")
     {output, status} = run_check(root, "check_release_data.exs")
@@ -548,7 +573,7 @@ defmodule UnicodeSecurity.GeneratorTest do
     end
 
     fixture = write_sources!(Path.join(root, "priv/unicode"))
-    source_directory = Path.join(root, "priv/unicode/18.0.0-draft")
+    source_directory = Source.directory(root)
     File.rename!(fixture, source_directory)
     output_directory = Path.join(root, "lib/unicode_security/data")
     Generator.generate!(source_directory, output_directory)

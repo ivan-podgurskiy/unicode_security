@@ -1,5 +1,7 @@
 # Source hashes require byte-for-byte preservation, including upstream line endings.
-priv/unicode/18.0.0-draft/* -text
+priv/unicode/18.0.0/* -text
+priv/unicode/sources.lock -text
+priv/unicode/18.0.0-release.term -text
 
 # Offline regeneration compares these files byte-for-byte on every platform.
 lib/unicode_security/data/*.ex text eol=lf

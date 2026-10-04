@@ -1,7 +1,8 @@
 alias UnicodeSecurity.UnicodeData.Generator
+alias UnicodeSecurity.UnicodeData.Source
 
 project_root = Path.expand("..", __DIR__)
-source_directory = Path.join(project_root, "priv/unicode/18.0.0-draft")
+source_directory = Source.directory(project_root)
 output_directory = Path.join(project_root, "lib/unicode_security/data")
 
 # Verify the complete lock before any generated file is written.

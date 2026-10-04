@@ -7,6 +7,7 @@ defmodule UnicodeSecurity.IdentifierTest do
   alias UnicodeSecurity.Normalization
   alias UnicodeSecurity.Test.ElixirRunner
   alias UnicodeSecurity.UnicodeData.IdentifierParser
+  alias UnicodeSecurity.UnicodeData.Source
 
   @status "# IdentifierStatus.txt\n# Version: 18.0.0\n# @missing: 0000..10FFFF; Restricted\n"
   @types "# IdentifierType.txt\n# Version: 18.0.0\n# @missing: 0000..10FFFF; Not_Character\n"
@@ -277,7 +278,7 @@ defmodule UnicodeSecurity.IdentifierTest do
   end
 
   defp reference_property(name) do
-    Path.join("priv/unicode/18.0.0-draft", name)
+    Path.join(Source.directory(File.cwd!()), name)
     |> File.stream!()
     |> Stream.map(fn line -> line |> String.split("#", parts: 2) |> hd() |> String.trim() end)
     |> Stream.reject(&(&1 == ""))
@@ -289,7 +290,8 @@ defmodule UnicodeSecurity.IdentifierTest do
   end
 
   defp canonical_decomposition_scalars do
-    "priv/unicode/18.0.0-draft/UnicodeData.txt"
+    Source.directory(File.cwd!())
+    |> Path.join("UnicodeData.txt")
     |> File.stream!()
     |> Stream.map(&String.split(&1, ";"))
     |> Stream.filter(fn fields ->

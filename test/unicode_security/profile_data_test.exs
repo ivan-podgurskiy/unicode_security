@@ -1,6 +1,7 @@
 defmodule UnicodeSecurity.ProfileDataTest do
   use ExUnit.Case, async: true
   alias UnicodeSecurity.Data.{Composition, Profile}
+  alias UnicodeSecurity.UnicodeData.Source
 
   test "looks up pinned profile properties" do
     assert Profile.category(?A) == :lu
@@ -98,7 +99,7 @@ defmodule UnicodeSecurity.ProfileDataTest do
   end
 
   defp fixture(name) do
-    Path.join("priv/unicode/18.0.0-draft", name)
+    Path.join(Source.directory(File.cwd!()), name)
     |> File.read!()
     |> String.split("\n")
     |> Enum.map(&(String.split(&1, "#", parts: 2) |> hd() |> String.trim()))

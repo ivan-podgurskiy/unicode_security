@@ -1,7 +1,10 @@
 defmodule UnicodeSecurity.Test.BidiFixtures do
   @moduledoc false
 
-  @directory Path.expand("../../priv/unicode/18.0.0-draft", __DIR__)
+  alias UnicodeSecurity.UnicodeData.Source
+
+  @project_root Path.expand("../..", __DIR__)
+  @directory Source.directory(@project_root)
   # Each representative has the required pinned Bidi_Class and is not a paired bracket.
   @representatives %{
     "L" => 0x61,

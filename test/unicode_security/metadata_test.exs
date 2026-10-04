@@ -5,15 +5,15 @@ defmodule UnicodeSecurity.MetadataTest do
   alias UnicodeSecurity.UnicodeData.Source
 
   # Catches public metadata drifting from the pinned source declarations or lock.
-  test "exposes complete, portable draft provenance matching the source lock" do
+  test "exposes complete, portable final provenance matching the source lock" do
     assert UnicodeSecurity.unicode_version() == "18.0.0"
     assert UnicodeSecurity.uts39_revision() == 34
 
     manifest = UnicodeSecurity.data_manifest()
-    assert manifest.release_status == :draft
+    assert manifest.release_status == :final
     assert length(manifest.sources) == 21
-    assert Enum.count(manifest.sources, &(&1.status == :draft)) == 19
-    assert Enum.count(manifest.sources, &(&1.status == :final)) == 2
+    assert Enum.count(manifest.sources, &(&1.status == :draft)) == 0
+    assert Enum.count(manifest.sources, &(&1.status == :final)) == 21
 
     {lock, []} = Code.eval_file("priv/unicode/sources.lock")
     declarations = Enum.sort_by(Source.sources(), & &1.name)
@@ -42,10 +42,10 @@ defmodule UnicodeSecurity.MetadataTest do
     :lu = UnicodeSecurity.Data.Profile.category(?A)
     :d = UnicodeSecurity.Data.Profile.joining_type(0x628)
     [0xE9] = UnicodeSecurity.Normalization.nfc_scalars([?e, 0x301])
-    %{release_status: :draft, sources: sources} = UnicodeSecurity.data_manifest()
+    %{release_status: :final, sources: sources} = UnicodeSecurity.data_manifest()
     21 = length(sources)
-    19 = Enum.count(sources, &(&1.status == :draft))
-    2 = Enum.count(sources, &(&1.status == :final))
+    0 = Enum.count(sources, &(&1.status == :draft))
+    21 = Enum.count(sources, &(&1.status == :final))
     {:mapped, [?a]} = UnicodeSecurity.Data.Idna.lookup(?A)
     18 = UnicodeSecurity.Data.Idna.maximum_mapping_length()
     %{__struct__: UnicodeSecurity.Result,verdict: :safe, skeleton: "rn", reasons: []} =

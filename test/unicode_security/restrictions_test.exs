@@ -5,6 +5,7 @@ defmodule UnicodeSecurity.RestrictionsTest do
   alias UnicodeSecurity.InvalidInputError
   alias UnicodeSecurity.Test.ElixirRunner
   alias UnicodeSecurity.UnicodeData.Parser
+  alias UnicodeSecurity.UnicodeData.Source
 
   # Literal expectations catch order changes, raw-profile gating, lost augmentation,
   # and subtracting Latin from each set instead of dropping the whole SOSS entry.
@@ -71,7 +72,8 @@ defmodule UnicodeSecurity.RestrictionsTest do
   @tag timeout: 120_000
   test "matches all decimal scalars and absent values in independently parsed UnicodeData" do
     expected =
-      "priv/unicode/18.0.0-draft/UnicodeData.txt"
+      Source.directory(File.cwd!())
+      |> Path.join("UnicodeData.txt")
       |> File.stream!()
       |> Enum.reduce(%{}, fn line, acc ->
         [hex, _name, category, _ccc, _bidi, _decomp, decimal | _] =

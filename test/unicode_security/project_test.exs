@@ -1,6 +1,8 @@
 defmodule UnicodeSecurity.ProjectTest do
   use ExUnit.Case, async: true
 
+  alias UnicodeSecurity.UnicodeData.Source
+
   test "publishes the PRD package contract" do
     project = UnicodeSecurity.MixProject.project()
     package = project[:package]
@@ -73,7 +75,12 @@ defmodule UnicodeSecurity.ProjectTest do
   end
 
   test "Windows checkout preserves the exact bytes of vendored Unicode inputs" do
-    assert_checkout_bytes(Path.wildcard("priv/unicode/18.0.0-draft/*"))
+    source_directory = Source.directory(File.cwd!()) |> Path.relative_to(File.cwd!())
+
+    assert_checkout_bytes(
+      Path.wildcard(Path.join(source_directory, "*")) ++
+        ["priv/unicode/sources.lock", "priv/unicode/18.0.0-release.term"]
+    )
   end
 
   test "Windows checkout preserves LF bytes of generated runtime modules" do

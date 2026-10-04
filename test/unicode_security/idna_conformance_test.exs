@@ -3,9 +3,10 @@ defmodule UnicodeSecurity.IdnaConformanceTest do
 
   alias UnicodeSecurity.Idna
   alias UnicodeSecurity.Test.IdnaFixtures
+  alias UnicodeSecurity.UnicodeData.Source
 
   test "all locked IDNA rows, Unicode and nontransitional ASCII" do
-    text = File.read!("priv/unicode/18.0.0-draft/IdnaTestV2.txt")
+    text = File.read!(Path.join(Source.directory(File.cwd!()), "IdnaTestV2.txt"))
     rows = IdnaFixtures.parse!(text)
 
     source_rows =
