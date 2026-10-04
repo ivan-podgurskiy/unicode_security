@@ -60,6 +60,67 @@ defmodule UnicodeSecurity.DomainTest do
     assert UnicodeSecurity.check("0x7f.1", type: :domain).valid_input?
   end
 
+  test "whole-name IDNA validity includes hostname restrictions" do
+    for input <- ["127.0.0.1", "１２７.０.０.１", "00127.000.0.1", "127.0.0.1."] do
+      result = UnicodeSecurity.check(input, type: :domain)
+      refute result.valid_input?
+      refute result.domain.valid_idna?
+      assert Enum.any?(result.reasons, &(&1.code == :domain_invalid_hostname))
+    end
+
+    assert UnicodeSecurity.check("123.456.789.012", type: :domain).domain.valid_idna?
+    assert UnicodeSecurity.check("aа.a", type: :domain).domain.valid_idna?
+  end
+
+  test "invalid labels have no public ASCII form while valid neighbors retain theirs" do
+    bidi = UnicodeSecurity.check("1a.א", type: :domain)
+    assert Enum.map(bidi.domain.labels, & &1.ascii) == [nil, "xn--4db"]
+    refute hd(bidi.domain.labels).valid_idna?
+
+    for input <- ["xn--a-bcb.good", "xn--u-ccb.good"] do
+      result = UnicodeSecurity.check(input, type: :domain)
+      assert Enum.map(result.domain.labels, & &1.ascii) == [nil, "good"]
+      refute hd(result.domain.labels).valid_idna?
+    end
+
+    empty = UnicodeSecurity.check("a..good", type: :domain)
+    assert Enum.map(empty.domain.labels, & &1.ascii) == ["a", nil, "good"]
+
+    assert Enum.map(UnicodeSecurity.check("a.", type: :domain).domain.labels, & &1.ascii) ==
+             ["a", ""]
+  end
+
+  test "decoded hostname syntax uses original A-label scope after ignored source" do
+    result = UnicodeSecurity.check("\u00ADxn--:-bga.good", type: :domain)
+
+    assert Enum.any?(result.reasons, fn reason ->
+             reason.code == :domain_invalid_hostname and
+               reason.details.rule == :hostname_syntax and
+               reason.details.codepoint == ?: and
+               reason.details.source_scope == :label and
+               reason.byte_offset == 0 and reason.codepoint_index == 0 and
+               reason.details.label_index == 0
+           end)
+
+    assert Enum.any?(result.reasons, fn reason ->
+             reason.code == :domain_invalid_hostname and
+               reason.details.rule == :hostname_syntax and
+               reason.details.codepoint == ?: and
+               reason.details.source_scope == :scalar and
+               reason.byte_offset == 6 and reason.codepoint_index == 5 and
+               reason.details.label_index == 0
+           end)
+  end
+
+  test "zero-length names do not claim to exceed the DNS maximum" do
+    for input <- ["", ".", "\u00AD", "\u00AD."] do
+      result = UnicodeSecurity.check(input, type: :domain)
+      refute result.valid_input?
+      assert Enum.any?(result.reasons, &(&1.code == :domain_empty_label))
+      refute Enum.any?(result.reasons, &(&1.code == :domain_name_too_long))
+    end
+  end
+
   test "hostname syntax mapped from fullwidth source remains attributable" do
     result = UnicodeSecurity.check("a／b.good", type: :domain)
     refute result.valid_input?

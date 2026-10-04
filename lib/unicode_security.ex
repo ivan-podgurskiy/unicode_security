@@ -53,7 +53,8 @@ defmodule UnicodeSecurity do
   checks. An optional final root is accepted by the public hostname adapter.
   IDNA or hostname failures keep safe partial label facts but leave whole-name
   Unicode, ASCII, and skeleton values nil. Domain validity is independent of
-  the selected security policy.
+  the selected security policy. `domain.valid_idna?` includes IDNA rules, DNS
+  lengths, and hostname restrictions; invalid labels have nil ASCII forms.
 
   Every binary with valid configuration returns `UnicodeSecurity.Result`,
   including empty, malformed UTF-8 and input over 4,096 original bytes. Partial
@@ -198,6 +199,9 @@ defmodule UnicodeSecurity do
   scalar for generic types, including removed controls. Byte offsets and scalar
   indexes refer to original input; `skeleton_spans` use output scalar coordinates.
   `:all` denotes wholly neutral resolved scripts, and `[]` a mixed intersection.
+  Invalid domain hostnames raise `UnicodeSecurity.InvalidDomainError` with the
+  first validity `reason`, original `byte_offset`, and `label_index`. Malformed
+  UTF-8 or oversized input still raises `UnicodeSecurity.InvalidInputError`.
 
   ## Example
 
@@ -215,7 +219,10 @@ defmodule UnicodeSecurity do
   payloads, with one optional final root ignored.
   Policy and script overrides are not accepted. The original UTF-8 input is
   validated with the 4,096-byte limit; there is no case folding, trimming, or
-  policy check for generic types. Domain names must pass hostname validation.
+  policy check for generic types. Domain names must pass hostname validation;
+  failures raise `UnicodeSecurity.InvalidDomainError` with `reason`, original
+  `byte_offset`, and `label_index`. Malformed UTF-8 and oversized input still
+  raise `UnicodeSecurity.InvalidInputError`.
   Persist the original input and Unicode version alongside any
   application-owned key index, and recompute versioned keys on data upgrades.
   The key alone does not decide identity or authorization.
@@ -236,6 +243,10 @@ defmodule UnicodeSecurity do
   the first match; malformed or nonbinary visited values raise, while unvisited
   values are untouched. This is an advisory check: concurrent storage changes may
   alter the result, and matching does not establish ownership or authorization.
+  Invalid domain candidates or visited hostnames raise
+  `UnicodeSecurity.InvalidDomainError` with `reason`, `byte_offset`, and
+  `label_index`; malformed UTF-8 or oversized input raises
+  `UnicodeSecurity.InvalidInputError`.
   """
   @spec conflicts?(binary(), Enumerable.t(), term()) :: boolean()
   defdelegate conflicts?(input, existing, options), to: UnicodeSecurity.Conflicts
@@ -248,6 +259,10 @@ defmodule UnicodeSecurity do
   UTF-8 binary of at most 4,096 bytes, and may raise. Duplicates are retained.
   Results are advisory and must be paired with application storage checks; they
   are not policy verdicts or authorization decisions.
+  Invalid domain candidates or visited hostnames raise
+  `UnicodeSecurity.InvalidDomainError` with `reason`, `byte_offset`, and
+  `label_index`; malformed UTF-8 or oversized input raises
+  `UnicodeSecurity.InvalidInputError`.
   """
   @spec conflicts(binary(), Enumerable.t(), term()) :: [UnicodeSecurity.Conflict.t()]
   defdelegate conflicts(input, existing, options), to: UnicodeSecurity.Conflicts

@@ -100,7 +100,8 @@ UnicodeSecurity.check("https://a", type: :domain).valid_input?
 
 The domain Result uses `:strict` by default; `:default`, `:permissive`, and the
 existing script allow/deny options are explicit overrides. `domain.labels` preserves
-source bytes, zero-based byte/scalar spans, normalized Unicode and ASCII forms,
+source bytes, zero-based byte/scalar spans, normalized Unicode and ASCII forms
+(ASCII is `nil` for an invalid label),
 and isolated security facts for each label. The root label can contain ignored
 source text. Per-label scripts, mixed-script and mixed-number checks do not combine
 unrelated labels. Whole-name flags aggregate those findings. Security policy
@@ -128,6 +129,18 @@ are static. Details identify the original label, offset, scalar or whole-label
 scope, triggering codepoint where one exists, and the relevant rule. Domain
 validity failures are critical/high/high under strict/default/permissive;
 deviation is medium/low/info. Other security reasons keep the policy matrix below.
+The whole `domain.valid_idna?` flag includes IDNA, DNS lengths and hostname-only
+restrictions; valid labels retain their own `valid_idna?` independently.
+Normalized findings from decoded A-labels use the original label start and
+`source_scope: :label`; raw hostname-syntax findings use scalar positions.
+
+Domain keys and typed comparisons raise `UnicodeSecurity.InvalidDomainError`
+when a hostname is invalid. Its `reason`, zero-based `byte_offset`, and
+`label_index` identify the first validity failure. This applies to candidates
+and visited values in `conflicts?/3` and `conflicts/3`. Malformed UTF-8 and the
+4,096-byte input limit still raise `UnicodeSecurity.InvalidInputError` in these
+primitives. `check/2`, `audit/2`, and `check_many/2` return diagnostic results
+for those inputs instead of raising these validation errors.
 
 `conflicts?/3` validates only the visited prefix and stops at the first match;
 `conflicts/3` visits all entries and preserves duplicate matches. `audit/2` is a
@@ -175,8 +188,9 @@ one source contribution into noncontiguous spans. The aggregate class is `:none`
 
 `compare/3`, `conflict_key/2`, `conflicts?/3` and `conflicts/3` accept only the
 `type` option (`:username`, `:tenant_slug`, `:organization_name`, `:domain`); they do not
-accept a policy preset or script overrides. The three current types use the same
-key. Invalid options fail before input validation. Inputs validate left to right;
+accept a policy preset or script overrides. The three identifier types use their
+existing skeleton key; domain uses escaped normalized-label keys. Invalid options
+fail before input validation. Inputs validate left to right;
 for existing collections the candidate validates before the enumerable. Visited
 existing values must be valid UTF-8 binaries within 4,096 bytes. `conflicts?/3`
 stops at the first match; `conflicts/3` consumes all values and retains repeated
@@ -247,7 +261,7 @@ case, length-in-characters, or business naming rules:
 | `:username` | Unicode letters L*, marks M*, decimal digits Nd; ASCII `_-.` | `_-.` | `:default` |
 | `:tenant_slug` | L*, M*, Nd; ASCII `-` | `-` | `:default` |
 | `:organization_name` | L*, M*, Nd; pinned White_Space; punctuation Pc/Pd/Ps/Pe/Pi/Pf/Po | none | `:permissive` |
-| `:domain` | Valid UTS #46 hostname with DNS length checks and one optional final root | none | `:strict` |
+| `:domain` | Valid UTS #46 hostname with DNS length checks and one optional final root | ASCII `-` | `:strict` |
 
 ZWJ and ZWNJ use the normative UTS #39 revision 34 §3.1.1.1 context rules on
 internal pinned NFC, rather than generic syntax or IDNA CONTEXTJ rules. Internal
@@ -257,11 +271,14 @@ and default-ignorable findings. Organization whitespace syntax also preserves al
 status and control findings. Symbols and other unsupported categories produce
 `profile_syntax`. Even ASCII input can contain restricted characters or MA mappings.
 
-Raw facts (`scripts`, `mixed_script?`, `mixed_number?`, `restriction_level`,
-`skeleton`) retain the standards primitive meanings. Per-scalar restrictions refer
+For the three identifier types, raw facts (`scripts`, `mixed_script?`,
+`mixed_number?`, `restriction_level`, `skeleton`) retain the standards primitive
+meanings. Per-scalar restrictions refer
 to the exact original scalars. Thus `"ĕ"` has raw Restricted/Uncommon_Use status
 and a restricted-character finding, while `"e\u0306"` uses Allowed scalars and
-has no such finding; both have canonically allowed membership and equal skeletons.
+has no such finding; both have canonically allowed membership and equal skeletons
+under identifier checks. Domain checks analyze normalized labels and can report
+a restricted finding for the composed result of `"e\u0306"`.
 The default verdicts are dangerous and safe, respectively. Permissive makes the
 composed form suspicious. Organization `"Acme & Co."` permits spaces and `&`
 syntactically but reports their raw Restricted status, making it suspicious under
@@ -299,8 +316,9 @@ All three policies work with all four types. Ordered restriction levels are
 | `restriction_level_below_policy` | `%{actual: raw_level, minimum: policy_minimum}` | high | medium | low |
 
 The highest severity determines verdict: no findings or only info → safe;
-low/medium → suspicious; high/critical → dangerous. Current checks emit the 13
-codes above, no collision or generic confusable finding. Use codes and structured
+low/medium → suspicious; high/critical → dangerous. Identifier checks emit the 13
+codes above; domain checks also emit the domain codes listed earlier. Neither emits
+a collision or generic confusable finding. Use codes and structured
 details for logic. Messages are static, concise text, never the entire untrusted
 input, and are not a localization or parsing API.
 
@@ -313,12 +331,14 @@ scalar index. Invalid UTF-8 returns one critical reason at the decoder's origina
 byte offset and a nil scalar index. Both have `valid_input?: false` and nil
 `scripts`, `mixed_script?`, `mixed_number?`, `restriction_level`, `skeleton`.
 Empty input is valid UTF-8: `valid_input?: true`, empty scripts/skeleton, false mixed
-flags and `:ascii` level, plus a high reason at byte/scalar index zero. A false
+flags and `:ascii` level, plus a high reason at byte/scalar index zero for the
+three identifier types. An empty domain has an invalid empty label. A false
 `valid_input?` describes decoding, size, or domain validity failure; policy danger
 does not make it false.
 
-Scalar reasons have original zero-based byte offsets and scalar indexes, not
-normalized or grapheme positions. Global mixed and below-policy findings have nil
+Identifier scalar reasons have original zero-based byte offsets and scalar indexes,
+not normalized or grapheme positions. Domain findings use original source positions
+with explicit scalar or label scope. Global mixed and below-policy findings have nil
 positions and follow all positional reasons. Sorting is byte offset, code atom,
 then deterministic details (including script atom/codepoint ties); global findings
 sort by code and details. Duplicate offset/code/details findings are removed.

@@ -1,11 +1,10 @@
 defmodule UnicodeSecurity.Domain.Classes do
-  @moduledoc """
-  Correlated Unicode-label facts for one domain skeleton bucket.
+  @moduledoc false
 
-  Canonical vectors are deduplicated within each resolved-script signature.
-  A class exists only when a pair has an unequal label at that class's rank
-  while every potentially stronger label is equal.
-  """
+  # Correlated Unicode-label facts for one domain skeleton bucket.
+  # Canonical vectors are deduplicated within each resolved-script signature.
+  # A class exists only when a pair has an unequal label at that class's rank
+  # while every potentially stronger label is equal.
 
   alias UnicodeSecurity.{Collision, Comparison, Pair}
 

@@ -3,6 +3,7 @@ defmodule UnicodeSecurity.DomainBatchTest do
 
   alias UnicodeSecurity.{
     Batch,
+    Check,
     Collision,
     Domain,
     Duplicate,
@@ -14,6 +15,7 @@ defmodule UnicodeSecurity.DomainBatchTest do
   }
 
   alias UnicodeSecurity.Batch.Groups
+  alias UnicodeSecurity.Idna.Punycode
 
   @precedence [:mixed_script_confusable, :whole_script_confusable, :single_script_confusable]
 
@@ -167,26 +169,64 @@ defmodule UnicodeSecurity.DomainBatchTest do
     watched = [
       {Utf8, :decode!, 1},
       {Idna, :to_ascii, 1},
+      {Idna, :process_tagged, 2},
+      {Punycode, :encode, 2},
+      {Punycode, :decode, 2},
       {Domain, :validate!, 1},
       {Domain, :prepare, 2},
+      {Check, :analyze_decoded, 3},
       {Pair, :prepare, 1},
       {Pair, :from_decoded, 2},
       {SkeletonTrace, :trace, 2},
       {Domain.Comparison, :trace, 2}
     ]
 
-    for spec <- watched, do: :erlang.trace_pattern(spec, true, [:local])
-    :erlang.trace(self(), true, [:call])
+    parent = self()
 
-    try do
-      result = Enum.reduce(items, Groups.new(), &Groups.add(&2, &1)) |> Groups.finish(policy)
-      assert [%{classes: [:mixed_script_confusable]}] = result.collisions
-    after
-      :erlang.trace(self(), false, [:call])
-      for spec <- watched, do: :erlang.trace_pattern(spec, false, [:local])
+    worker =
+      spawn(fn ->
+        receive do
+          :control ->
+            Domain.validate!("a")
+            send(parent, :control_done)
+        end
+
+        receive do
+          :group ->
+            result =
+              Enum.reduce(items, Groups.new(), &Groups.add(&2, &1)) |> Groups.finish(policy)
+
+            send(parent, {:group_result, result})
+        end
+
+        receive do: (:stop -> :ok)
+      end)
+
+    for {module, _, _} = spec <- watched do
+      Code.ensure_loaded!(module)
+      :erlang.trace_pattern(spec, true, [])
     end
 
-    assert trace_calls() == []
+    :erlang.trace(worker, true, [:call, {:tracer, parent}])
+
+    try do
+      send(worker, :control)
+      assert_receive :control_done
+      control_ref = :erlang.trace_delivered(worker)
+      assert_receive {:trace_delivered, ^worker, ^control_ref}
+      assert Enum.any?(trace_calls(worker), &match?({Domain, :validate!, ["a"]}, &1))
+
+      send(worker, :group)
+      assert_receive {:group_result, result}
+      group_ref = :erlang.trace_delivered(worker)
+      assert_receive {:trace_delivered, ^worker, ^group_ref}
+      assert [%{classes: [:mixed_script_confusable]}] = result.collisions
+      assert trace_calls(worker) == []
+    after
+      :erlang.trace(worker, false, [:all])
+      for spec <- watched, do: :erlang.trace_pattern(spec, false, [])
+      send(worker, :stop)
+    end
   end
 
   defp oracle_groups(results) do
@@ -300,9 +340,9 @@ defmodule UnicodeSecurity.DomainBatchTest do
     for item <- items, rest <- permutations(List.delete(items, item)), do: [item | rest]
   end
 
-  defp trace_calls do
+  defp trace_calls(worker) do
     receive do
-      {:trace, _pid, :call, spec} -> [spec | trace_calls()]
+      {:trace, ^worker, :call, spec} -> [spec | trace_calls(worker)]
     after
       0 -> []
     end

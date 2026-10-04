@@ -1,7 +1,7 @@
 defmodule UnicodeSecurity.Idna do
-  @moduledoc """
-  Pinned UTS #46 nontransitional IDNA processing over Unicode scalars.
-  """
+  @moduledoc false
+
+  # Pinned UTS #46 nontransitional IDNA processing over Unicode scalars.
 
   alias UnicodeSecurity.Data.Idna, as: Table
   alias UnicodeSecurity.Idna.{Bidi, ContextJ, LabelRules, Punycode}
@@ -402,7 +402,7 @@ defmodule UnicodeSecurity.Idna do
       name = Enum.map_join(labels, ".", & &1.ascii)
       length = byte_size(name) - if(trailing_dot?, do: 1, else: 0)
 
-      if length in 1..253 do
+      if length <= 253 do
         []
       else
         [issue(:domain_name_too_long, nil, nil, nil, %{actual_bytes: length, maximum_bytes: 253})]

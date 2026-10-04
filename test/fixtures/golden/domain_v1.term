@@ -91,7 +91,7 @@
          %UnicodeSecurity.DomainLabel{
            index: 1, input: "", byte_offset: 2, byte_length: 0,
            codepoint_index: 2, codepoint_count: 0, root?: false,
-           unicode: "", ascii: "", mapped?: false, valid_idna?: false,
+           unicode: "", ascii: nil, mapped?: false, valid_idna?: false,
            verdict: :dangerous,
            reasons: [%UnicodeSecurity.Reason{
              code: :domain_empty_label, severity: :critical,
@@ -576,7 +576,7 @@
          %UnicodeSecurity.DomainLabel{
            index: 0, input: "1a", byte_offset: 0, byte_length: 2,
            codepoint_index: 0, codepoint_count: 2, root?: false,
-           unicode: "1a", ascii: "1a", mapped?: false, valid_idna?: false,
+           unicode: "1a", ascii: nil, mapped?: false, valid_idna?: false,
            verdict: :dangerous,
            reasons: [%UnicodeSecurity.Reason{
              code: :domain_bidi_rule, severity: :critical,

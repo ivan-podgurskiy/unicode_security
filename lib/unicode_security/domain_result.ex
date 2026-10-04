@@ -6,7 +6,7 @@ defmodule UnicodeSecurity.DomainResult do
   optional final root dot. They are `nil` after any hostname validity failure,
   while `labels` retains independently safe partial results. `mapped?` reports
   whether the whole Unicode form differs from original input. `valid_idna?`
-  covers IDNA rules separately from additional public hostname syntax checks.
+  includes IDNA rules, DNS lengths, and public hostname restrictions.
   `uts46_revision` identifies the pinned nontransitional processing rules.
   """
   defstruct [

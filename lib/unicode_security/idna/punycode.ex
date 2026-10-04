@@ -1,8 +1,8 @@
 defmodule UnicodeSecurity.Idna.Punycode do
-  @moduledoc """
-  Bounded RFC 3492 Punycode bodies. The caller supplies the output limit;
-  this module does not add or remove the `xn--` prefix.
-  """
+  @moduledoc false
+
+  # Bounded RFC 3492 Punycode bodies. The caller supplies the output limit;
+  # this module does not add or remove the `xn--` prefix.
 
   @base 36
   @tmin 1

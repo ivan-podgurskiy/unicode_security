@@ -101,6 +101,11 @@ for {name, input, expected_valid?} <- check_cases do
 end
 
 for {name, names} <- batch_cases do
+  batch = UnicodeSecurity.check_many(names, type: :domain)
+  valid_count = Enum.count(batch.results, & &1.result.valid_input?)
+
+  if valid_count != length(names), do: raise("benchmark batch validity changed: #{name}")
+
   input_bytes = Enum.reduce(names, 0, fn item, total -> total + byte_size(item) end)
 
   scalar_count =
@@ -108,7 +113,7 @@ for {name, names} <- batch_cases do
 
   metadata =
     "items=#{length(names)}, original_bytes=#{input_bytes}, scalars=#{scalar_count}, " <>
-      "ascii_bytes=n/a, valid_input?=all"
+      "ascii_bytes=n/a, valid_items=#{valid_count}/#{length(names)}"
 
   measure.(name, metadata, fn -> UnicodeSecurity.check_many(names, type: :domain) end)
 end

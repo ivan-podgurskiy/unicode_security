@@ -62,7 +62,7 @@ defmodule UnicodeSecurity.Domain do
       labels: labels,
       trailing_dot?: report.trailing_dot?,
       mapped?: if(valid?, do: scalars_to_binary(report.unicode) != input, else: nil),
-      valid_idna?: report.valid?
+      valid_idna?: valid?
     }
 
     if valid? do
@@ -180,7 +180,7 @@ defmodule UnicodeSecurity.Domain do
       codepoint_count: unit.codepoint_count,
       root?: label.root?,
       unicode: if(label.unicode, do: scalars_to_binary(label.unicode), else: nil),
-      ascii: label.ascii,
+      ascii: if(label.valid?, do: label.ascii, else: nil),
       mapped?: if(label.unicode, do: scalars_to_binary(label.unicode) != unit.input, else: nil),
       valid_idna?: label.valid?
     }
@@ -259,13 +259,7 @@ defmodule UnicodeSecurity.Domain do
         hostname_syntax_issue(index, units, scalar)
       end)
 
-    normalized =
-      report.labels
-      |> Enum.flat_map(fn label ->
-        (label.tagged || [])
-        |> Enum.filter(fn {scalar, _origin} -> scalar in @hostname_syntax end)
-        |> Enum.map(fn {scalar, origin} -> hostname_syntax_issue(origin, units, scalar) end)
-      end)
+    normalized = Enum.flat_map(report.labels, &normalized_hostname_issues/1)
 
     ip =
       if ipv4?(report.labels) do
@@ -285,6 +279,15 @@ defmodule UnicodeSecurity.Domain do
     Enum.uniq(raw ++ normalized ++ ip)
   end
 
+  defp normalized_hostname_issues(label) do
+    (label.tagged || [])
+    |> Enum.filter(fn {scalar, _origin} -> scalar in @hostname_syntax end)
+    |> Enum.map(fn {scalar, origin} ->
+      scope = if(label.alabel?, do: :label, else: :scalar)
+      hostname_syntax_issue(origin, label.index, scalar, scope)
+    end)
+  end
+
   defp hostname_syntax_issue(origin, units, scalar) do
     label_index =
       Enum.find_value(units, fn unit ->
@@ -293,11 +296,15 @@ defmodule UnicodeSecurity.Domain do
            do: unit.label_index
       end)
 
+    hostname_syntax_issue(origin, label_index, scalar, :scalar)
+  end
+
+  defp hostname_syntax_issue(origin, label_index, scalar, scope) do
     %{
       code: :domain_invalid_hostname,
       label_index: label_index,
       origin: origin,
-      source_scope: :scalar,
+      source_scope: scope,
       details: %{rule: :hostname_syntax, codepoint: scalar}
     }
   end
