@@ -57,12 +57,12 @@ defmodule UnicodeSecurity.ReleaseDataTest do
     assert bidi.changed? == true
 
     assert bidi.before == %{
-             bytes: 27352,
+             bytes: 27_352,
              sha256: "cd47918b28b73c3be37d730d0f48ab11e862afef9eb11d85ad832be9fb6c7f8f"
            }
 
     assert bidi.after == %{
-             bytes: 27294,
+             bytes: 27_294,
              sha256: "cd54810ebf52f0e61a730c8b9cb25975de6c85f6d788a559b416afd548923fd6"
            }
 

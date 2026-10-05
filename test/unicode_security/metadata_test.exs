@@ -12,7 +12,7 @@ defmodule UnicodeSecurity.MetadataTest do
     manifest = UnicodeSecurity.data_manifest()
     assert manifest.release_status == :final
     assert length(manifest.sources) == 21
-    assert Enum.count(manifest.sources, &(&1.status == :draft)) == 0
+    refute Enum.any?(manifest.sources, &(&1.status == :draft))
     assert Enum.count(manifest.sources, &(&1.status == :final)) == 21
 
     {lock, []} = Code.eval_file("priv/unicode/sources.lock")
