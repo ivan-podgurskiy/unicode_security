@@ -141,8 +141,9 @@ defmodule UnicodeSecurity.UnicodeData.Source do
     Path.join([project_root, "priv", "unicode", @source_directory])
   end
 
-  @spec fetch!([map()], Path.t(), :locked | :update_lock) :: map()
-  def fetch!(declarations, directory, mode \\ :locked) when mode in [:locked, :update_lock] do
+  @spec fetch!([map()], Path.t(), :locked | :update_lock, keyword()) :: map()
+  def fetch!(declarations, directory, mode \\ :locked, options \\ [])
+      when mode in [:locked, :update_lock] do
     declarations = validate_fetch_declarations!(declarations)
     parent = Path.dirname(directory)
     lock_path = Path.join(parent, "sources.lock")
@@ -167,7 +168,11 @@ defmodule UnicodeSecurity.UnicodeData.Source do
       Enum.each(declarations, &fetch_source!(&1, staging))
       if expected_lock, do: verify!(declarations, staging, expected_lock)
       lock = lock!(declarations, staging)
-      install_staged!(staging, directory)
+
+      options =
+        if mode == :update_lock, do: Keyword.put(options, :lock, {lock_path, lock}), else: options
+
+      install_staged!(staging, directory, options)
       lock
     after
       if File.exists?(staging), do: File.rm_rf!(staging)
@@ -210,26 +215,70 @@ defmodule UnicodeSecurity.UnicodeData.Source do
   end
 
   @doc false
-  @spec install_staged!(Path.t(), Path.t(), (Path.t() -> term())) :: :ok
-  def install_staged!(staging, directory, cleanup \\ &File.rm_rf!/1) do
-    if File.exists?(directory) do
-      backup = temporary_path(directory, "backup")
-      File.rename!(directory, backup)
+  @spec install_staged!(Path.t(), Path.t(), keyword()) :: :ok
+  def install_staged!(staging, directory, options \\ []) do
+    lock = Keyword.get(options, :lock)
+    temporary_lock = if lock, do: temporary_path(elem(lock, 0), "tmp")
+    write = Keyword.get(options, :write_lock, &File.write!/3)
+    rename = Keyword.get(options, :rename, &File.rename!/2)
+    cleanup = Keyword.get(options, :cleanup, &File.rm_rf!/1)
 
-      try do
-        File.rename!(staging, directory)
-      rescue
-        error ->
-          if File.exists?(directory), do: File.rm_rf!(directory)
-          File.rename!(backup, directory)
-          reraise error, __STACKTRACE__
+    try do
+      replacements =
+        if lock do
+          {lock_path, candidate} = lock
+
+          contents =
+            inspect(candidate, pretty: true, limit: :infinity, printable_limit: :infinity)
+
+          write.(temporary_lock, contents <> "\n", [:binary, :exclusive])
+          [{staging, directory}, {temporary_lock, lock_path}]
+        else
+          [{staging, directory}]
+        end
+
+      # Backups survive until every replacement succeeds. Nested rollback restores
+      # both previous paths, including their absence, if any rename raises.
+      backups = replace_all!(replacements, rename)
+      Enum.each(backups, &cleanup_completed(&1, cleanup))
+      :ok
+    after
+      if temporary_lock && File.exists?(temporary_lock) do
+        File.rm!(temporary_lock)
+      end
+    end
+  end
+
+  defp replace_all!([], _rename), do: []
+
+  defp replace_all!([{candidate, destination} | rest], rename) do
+    backup =
+      if File.exists?(destination) do
+        path = temporary_path(destination, "backup")
+        rename.(destination, path)
+        path
       end
 
-      cleanup.(backup)
-      :ok
-    else
-      File.rename!(staging, directory)
+    try do
+      rename.(candidate, destination)
+      backups = replace_all!(rest, rename)
+      if backup, do: [backup | backups], else: backups
+    rescue
+      error ->
+        if File.exists?(destination), do: File.rm_rf!(destination)
+        if backup, do: File.rename!(backup, destination)
+        reraise error, __STACKTRACE__
     end
+  end
+
+  defp cleanup_completed(backup, cleanup) do
+    cleanup.(backup)
+  rescue
+    error ->
+      IO.warn(
+        "Unicode source transaction committed; could not remove #{backup}: " <>
+          Exception.message(error)
+      )
   end
 
   defp validate_declarations!(declarations) when is_list(declarations) do

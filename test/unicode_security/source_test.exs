@@ -54,8 +54,105 @@ defmodule UnicodeSecurity.SourceTest do
     updated = Source.fetch!([source], directory, :update_lock)
     Task.await(server)
     refute updated == previous
+    {published, []} = Code.eval_file(Path.join(root, "sources.lock"))
+    assert published == updated
     assert Source.verify!([source], directory, updated) == :ok
     assert File.read!(Path.join(directory, "sample.txt")) == body
+  end
+
+  # Breaks: publishing fixtures before the candidate lock is safely written/renamed.
+  test "rolls back both paths on lock write and transaction rename failures" do
+    for fixtures? <- [true, false],
+        lock? <- [true, false],
+        failure <- [:write, :fixtures, :lock, :fixtures_backup, :lock_backup],
+        failure != :fixtures_backup or fixtures?,
+        failure != :lock_backup or lock? do
+      root = temporary_directory()
+      directory = Path.join(root, "sources")
+      lock_path = Path.join(root, "sources.lock")
+      File.mkdir_p!(root)
+
+      if fixtures? do
+        File.mkdir!(directory)
+        File.write!(Path.join(directory, "sample.txt"), "old fixtures")
+      end
+
+      if lock?, do: File.write!(lock_path, "# original lock formatting\n%{}\n")
+      {url, server} = serve_once("# Version: 18.0.0\nupdated\n")
+      source = %{unicode_data_source(url) | name: "sample.txt"}
+
+      write = fn path, bytes, modes ->
+        File.write!(path, bytes, modes)
+        if failure == :write, do: raise("injected lock write failure")
+      end
+
+      rename = fn from, to ->
+        if (failure == :lock and to == lock_path) or
+             (failure == :fixtures and to == directory and String.contains?(from, ".staging-")) or
+             (failure == :fixtures_backup and from == directory) or
+             (failure == :lock_backup and from == lock_path) do
+          raise "injected rename failure"
+        end
+
+        File.rename!(from, to)
+      end
+
+      assert_raise RuntimeError, ~r/injected .* failure/, fn ->
+        Source.fetch!([source], directory, :update_lock, write_lock: write, rename: rename)
+      end
+
+      Task.await(server)
+      assert File.exists?(directory) == fixtures?
+      assert File.exists?(lock_path) == lock?
+      if fixtures?, do: assert(File.read!(Path.join(directory, "sample.txt")) == "old fixtures")
+      if lock?, do: assert(File.read!(lock_path) == "# original lock formatting\n%{}\n")
+      refute Enum.any?(File.ls!(root), &String.contains?(&1, [".staging-", ".backup-", ".tmp-"]))
+    end
+  end
+
+  test "creates both fixtures and lock when neither existed" do
+    root = temporary_directory()
+    directory = Path.join(root, "sources")
+    body = "# Version: 18.0.0\ninitial\n"
+    {url, server} = serve_once(body)
+    source = %{unicode_data_source(url) | name: "sample.txt"}
+
+    acquired = Source.fetch!([source], directory, :update_lock)
+    Task.await(server)
+    {published, []} = Code.eval_file(Path.join(root, "sources.lock"))
+    assert published == acquired
+    assert Source.verify!([source], directory, published) == :ok
+    assert File.read!(Path.join(directory, "sample.txt")) == body
+    assert Enum.sort(File.ls!(root)) == ["sources", "sources.lock"]
+  end
+
+  # Breaks: treating cleanup of a committed pair as failed acquisition.
+  test "publishes a matching lock even when backup cleanup raises" do
+    root = temporary_directory()
+    directory = Path.join(root, "sources")
+    File.mkdir_p!(directory)
+    File.write!(Path.join(directory, "sample.txt"), "old fixtures")
+    File.write!(Path.join(root, "sources.lock"), "%{}\n")
+    body = "# Version: 18.0.0\nupdated\n"
+    {url, server} = serve_once(body)
+    source = %{unicode_data_source(url) | name: "sample.txt"}
+
+    warning =
+      ExUnit.CaptureIO.capture_io(:stderr, fn ->
+        updated =
+          Source.fetch!([source], directory, :update_lock,
+            cleanup: fn _backup -> raise "injected cleanup failure" end
+          )
+
+        {published, []} = Code.eval_file(Path.join(root, "sources.lock"))
+        assert published == updated
+        assert Source.verify!([source], directory, published) == :ok
+      end)
+
+    Task.await(server)
+    assert warning =~ "injected cleanup failure"
+    assert File.read!(Path.join(directory, "sample.txt")) == body
+    assert Enum.count(File.ls!(root), &String.contains?(&1, ".backup-")) == 2
   end
 
   # Breaks: trusting replacement downloads when an authoritative lock survives
@@ -269,9 +366,12 @@ defmodule UnicodeSecurity.SourceTest do
       raise "cleanup failed"
     end
 
-    assert_raise RuntimeError, "cleanup failed", fn ->
-      Source.install_staged!(staging, directory, cleanup)
-    end
+    warning =
+      ExUnit.CaptureIO.capture_io(:stderr, fn ->
+        assert :ok = Source.install_staged!(staging, directory, cleanup: cleanup)
+      end)
+
+    assert warning =~ "cleanup failed"
 
     assert File.ls!(directory) == ["new-only.txt"]
     assert File.read!(Path.join(directory, "new-only.txt")) == "complete"
