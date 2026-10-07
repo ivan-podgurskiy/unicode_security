@@ -9,7 +9,8 @@ defmodule UnicodeSecurity.ReleaseCandidate.Report do
   """
 
   @spec write!(Path.t(), map()) :: :ok
-  def write!(path, report) do
+  @spec write!(Path.t(), map(), keyword()) :: :ok
+  def write!(path, report, opts \\ []) do
     File.mkdir_p!(Path.dirname(path))
     temporary = path <> ".#{System.unique_integer([:positive, :monotonic])}.tmp"
     bytes = :erlang.term_to_binary(report, [:deterministic])
@@ -19,7 +20,9 @@ defmodule UnicodeSecurity.ReleaseCandidate.Report do
     file = File.open!(temporary, [:write, :binary, :exclusive])
 
     try do
-      case IO.binwrite(file, bytes) do
+      write = Keyword.get(opts, :write, &IO.binwrite/2)
+
+      case write.(file, bytes) do
         :ok ->
           :ok
 

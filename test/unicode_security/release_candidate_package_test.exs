@@ -247,6 +247,26 @@ defmodule UnicodeSecurity.ReleaseCandidatePackageTest do
     refute File.exists?(Path.dirname(archive))
   end
 
+  # Breaks: treating a small compressed archive as safe despite excessive inner payload size.
+  test "rejects an oversized inner payload before writing unpacked files", context do
+    write!(context.unpacked, "README.md", :binary.copy("a", 4_194_305))
+    owner = self()
+
+    boundary =
+      build_boundary(context, fn args, _ ->
+        send(owner, {:size_attempt, args})
+        {"ok", 0}
+      end)
+
+    assert {:error, %{reason: :unpacked_size, unpacked_bytes: bytes, limit: 4_194_304}} =
+             Package.verify(context.root, cmd: boundary, tmp_dir: context.directory)
+
+    assert bytes > 4_194_304
+    assert_receive {:size_attempt, ["hex.build", "--output", archive]}
+    refute_receive {:size_attempt, ["deps.get" | _]}
+    refute File.exists?(Path.dirname(archive))
+  end
+
   # Breaks: rescuing an exception without releasing files owned by the verifier.
   test "cleans up when the command boundary raises", context do
     owner = self()
@@ -267,8 +287,8 @@ defmodule UnicodeSecurity.ReleaseCandidatePackageTest do
 
   # Breaks: private Hex bootstrapping or a fresh consumer unable to compile the real payload.
   @tag timeout: 120_000
-  test "builds and compiles the actual package in a fresh production consumer", context do
-    assert {:ok, metadata} = Package.verify(Path.expand("."), tmp_dir: context.directory)
+  test "builds and compiles the actual package in a fresh production consumer" do
+    assert {:ok, metadata} = Package.verify(Path.expand("."))
     assert metadata.consumer == :passed
     assert metadata.bytes > 0 and metadata.bytes <= 1_048_576
     assert "lib/unicode_security.ex" in metadata.files

@@ -93,7 +93,7 @@ defmodule UnicodeSecurity.ReleaseCandidate do
       name: :package,
       env: [{"MIX_ENV", "dev"}],
       run: fn context ->
-        case Package.verify(context.root) do
+        case Package.verify(context.root, Map.get(context, :package_opts, [])) do
           {:ok, package} -> {:ok, %{package: package}}
           {:error, result} -> {:error, result}
         end

@@ -189,6 +189,76 @@ defmodule UnicodeSecurity.ReleaseCandidateRunnerTest do
     assert read_report(context.report_path) == report
   end
 
+  # Breaks: raising or omitting preflight evidence when Git cannot identify a repository.
+  test "records a failed Git preflight without a source commit", context do
+    File.rm_rf!(Path.join(context.root, ".git"))
+    assert {:error, report} = Runner.run(options(context, []))
+    assert report.commit == ""
+
+    assert [
+             %{name: :preflight, status: :failed, result: result},
+             %{name: :repository_status, status: :failed}
+           ] = report.stages
+
+    assert result.argv == ["git", "rev-parse", "HEAD"]
+    assert result.status == 128
+    assert result.output =~ "not a git repository"
+    assert read_report(context.report_path) == report
+  end
+
+  # Breaks: certifying stages whose mutation prevents final status and commit verification.
+  test "records status and commit failures when a stage removes repository metadata", context do
+    stage = %{
+      name: :remove_git,
+      run: fn %{root: root} ->
+        File.rm_rf!(Path.join(root, ".git"))
+        {:ok, %{}}
+      end
+    }
+
+    assert {:error, report} = Runner.run(options(context, [stage]))
+
+    assert [
+             %{name: :remove_git, status: :passed},
+             %{name: :repository_status, status: :failed, result: status},
+             %{name: :repository_commit, status: :failed, result: commit}
+           ] = report.stages
+
+    assert status.argv == ["git", "status", "--porcelain=v1", "--untracked-files=all"]
+    assert commit.argv == ["git", "rev-parse", "HEAD"]
+    assert status.status == 128 and commit.status == 128
+    assert report.repository.before == ""
+    assert report.repository.after == status.output
+    refute report.repository.unchanged?
+    assert read_report(context.report_path) == report
+  end
+
+  # Breaks: hiding write errors, deleting previous evidence, or leaking the staging file.
+  test "preserves prior evidence and cleans staging after a structured write error", context do
+    previous = %{status: :passed, generation: :previous}
+    assert :ok = Report.write!(context.report_path, previous)
+    report = %{status: :failed, generation: :next}
+    owner = self()
+
+    write = fn file, bytes ->
+      send(owner, {:attempted_report, :erlang.binary_to_term(bytes)})
+      :ok = IO.binwrite(file, "partial bytes")
+      {:error, :enospc}
+    end
+
+    error =
+      assert_raise File.Error, fn -> Report.write!(context.report_path, report, write: write) end
+
+    assert error.reason == :enospc
+    assert error.action == "write to file"
+    assert String.starts_with?(error.path, context.report_path <> ".")
+    assert String.ends_with?(error.path, ".tmp")
+    assert_receive {:attempted_report, ^report}
+    refute File.exists?(error.path)
+    assert read_report(context.report_path) == previous
+    assert File.ls!(Path.dirname(context.report_path)) == ["report.term"]
+  end
+
   # Breaks: reporting success when writing evidence itself dirties the repository.
   test "includes the report file in the final repository comparison", context do
     context = %{context | report_path: Path.join(context.root, "report.term")}

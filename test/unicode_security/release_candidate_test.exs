@@ -1,5 +1,5 @@
 defmodule UnicodeSecurity.ReleaseCandidateTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias UnicodeSecurity.ReleaseCandidate
 
@@ -99,35 +99,109 @@ defmodule UnicodeSecurity.ReleaseCandidateTest do
     end
   end
 
-  # Breaks: dropping the package verifier's metadata at composition/runner boundary.
+  # Breaks: bypassing the real package verifier or dropping its archive evidence.
   test "includes package metadata in the final report", %{root: root} do
-    package = %{
-      archive: "/temporary/package.tar",
-      bytes: 321,
-      sha256: String.duplicate("a", 64),
-      files: ["mix.exs"],
-      consumer: :passed
+    owner = self()
+    bytes = package_fixture!(root)
+
+    boundary = fn _executable, args, opts ->
+      send(owner, {:package_command, args, opts})
+
+      case args do
+        ["hex.build", "--output", archive] ->
+          assert opts[:cd] == root
+          File.write!(archive, bytes)
+
+        ["run", "--no-compile", "consumer.exs"] ->
+          unpacked = Path.join(Path.dirname(opts[:cd]), "package")
+          assert File.read!(Path.join(unpacked, "README.md")) == "fixture README.md\n"
+
+        _ ->
+          :ok
+      end
+
+      {"package boundary passed", 0}
+    end
+
+    stage = package_stage(cmd: boundary, tmp_dir: Path.join(root, "tmp"))
+    assert {:ok, report} = ReleaseCandidate.run(root: root, stages: [stage])
+    assert report.version == UnicodeSecurity.MixProject.project()[:version]
+    assert report.package.bytes == byte_size(bytes)
+    assert report.package.sha256 == Base.encode16(:crypto.hash(:sha256, bytes), case: :lower)
+
+    assert report.package.files ==
+             Enum.sort(
+               ~w(.formatter.exs CHANGELOG.md LICENSE README.md THIRD_PARTY_NOTICES.md hex_metadata.config mix.exs)
+             )
+
+    assert report.package.consumer == :passed
+    assert [%{name: :package, status: :passed, result: %{package: package}}] = report.stages
+    assert package == report.package
+    assert report.repository.unchanged?
+    refute File.exists?(Path.dirname(package.archive))
+    assert_receive {:package_command, ["hex.build", "--output", archive], build_opts}
+    assert archive == package.archive
+    assert List.keyfind(build_opts[:env], "MIX_ENV", 0) == {"MIX_ENV", "prod"}
+
+    for args <- [
+          ["deps.get", "--only", "prod"],
+          ["compile", "--warnings-as-errors"],
+          ["run", "--no-compile", "consumer.exs"]
+        ] do
+      assert_receive {:package_command, ^args, opts}
+      assert opts[:env] == build_opts[:env]
+      assert opts[:cd] == Path.join(Path.dirname(archive), "consumer")
+    end
+  end
+
+  # Breaks: converting verifier failures into package success or discarding diagnostics.
+  test "preserves real package-stage failures and stops the composed gate", %{root: root} do
+    owner = self()
+
+    boundary = fn _executable, args, opts ->
+      send(owner, {:failed_package_command, args, opts})
+      {"package build failed", 23}
+    end
+
+    stage = package_stage(cmd: boundary, tmp_dir: Path.join(root, "tmp"))
+
+    later = %{
+      name: :never,
+      run: fn _ ->
+        send(owner, :unexpected_stage)
+        {:ok, %{}}
+      end
     }
 
-    stage = %{name: :package, run: fn _ -> {:ok, %{package: package}} end}
-    assert {:ok, report} = ReleaseCandidate.run(root: root, version: "0.1.0", stages: [stage])
-    assert report.package == package
-
-    assert report.stages == [
-             %{
-               name: :package,
-               status: :passed,
-               duration_ms: hd(report.stages).duration_ms,
-               result: %{package: package}
-             }
-           ]
+    assert {:error, report} = ReleaseCandidate.run(root: root, stages: [stage, later])
+    assert report.package == nil
+    assert [%{name: :package, status: :failed, result: result}] = report.stages
+    assert result.status == 23
+    assert result.output == "package build failed"
+    assert ["mix", "hex.build", "--output", archive] = result.argv
+    assert_receive {:failed_package_command, ["hex.build", "--output", ^archive], opts}
+    assert opts[:cd] == root
+    refute File.exists?(Path.dirname(archive))
+    refute_receive :unexpected_stage
+    assert report.repository.unchanged?
   end
 
   # Breaks: placing evidence in a nonignored path and invalidating a clean run.
   test "defaults the report to ignored tmp release-candidate term", %{root: root} do
-    assert {:ok, report} = ReleaseCandidate.run(root: root, version: "0.1.0", stages: [])
+    assert {:ok, report} = ReleaseCandidate.run(root: root, stages: [])
     assert read_report(Path.join(root, "tmp/release-candidate.term")) == report
     assert report.repository == %{before: "", after: "", unchanged?: true}
+  end
+
+  # Breaks: the zero-argument entry point skipping defaults or dirty preflight.
+  # File.cd! changes VM-wide cwd, so this test module is deliberately synchronous.
+  test "zero-argument entry point uses the current repository and default version", %{root: root} do
+    File.write!(Path.join(root, "dirty.txt"), "dirty\n")
+    assert {:error, report} = File.cd!(root, fn -> ReleaseCandidate.run() end)
+    assert report.version == UnicodeSecurity.MixProject.project()[:version]
+    assert report.stages == []
+    assert report.repository.before == "?? dirty.txt\n"
+    assert read_report(Path.join(root, "tmp/release-candidate.term")) == report
   end
 
   # Breaks: exposing no runnable alias or broadening the release package.
@@ -226,6 +300,42 @@ defmodule UnicodeSecurity.ReleaseCandidateTest do
     assert result.seed == 34
     assert result.status == 9
     assert result.output == "seed failed"
+  end
+
+  defp package_stage(options) do
+    stage = Enum.find(ReleaseCandidate.default_stages(), &(&1.name == :package))
+    %{stage | run: fn context -> stage.run.(Map.put(context, :package_opts, options)) end}
+  end
+
+  defp package_fixture!(root) do
+    temporary = Path.join(root, "tmp")
+    File.mkdir_p!(temporary)
+    contents = Path.join(temporary, "contents.tar.gz")
+    archive = Path.join(temporary, "fixture.tar")
+
+    files =
+      for path <-
+            ~w(.formatter.exs CHANGELOG.md LICENSE README.md THIRD_PARTY_NOTICES.md mix.exs),
+          do: {String.to_charlist(path), "fixture #{path}\n"}
+
+    :ok = :erl_tar.create(String.to_charlist(contents), files, [:compressed])
+    compressed = File.read!(contents)
+    metadata = "[].\n"
+    checksum = :crypto.hash(:sha256, "3" <> metadata <> compressed) |> Base.encode16()
+
+    :ok =
+      :erl_tar.create(
+        String.to_charlist(archive),
+        [
+          {~c"VERSION", "3"},
+          {~c"CHECKSUM", checksum},
+          {~c"metadata.config", metadata},
+          {~c"contents.tar.gz", compressed}
+        ],
+        []
+      )
+
+    File.read!(archive)
   end
 
   defp read_report(path), do: path |> File.read!() |> :erlang.binary_to_term()
