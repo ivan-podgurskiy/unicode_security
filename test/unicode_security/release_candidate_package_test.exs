@@ -133,8 +133,9 @@ defmodule UnicodeSecurity.ReleaseCandidatePackageTest do
 
     assert metadata.consumer == :passed
     assert metadata.files == @files
-    assert metadata.bytes == 3
-    assert metadata.sha256 == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    assert_receive {:built_tarball, recorded}
+    assert metadata.bytes == byte_size(recorded)
+    assert metadata.sha256 == Base.encode16(:crypto.hash(:sha256, recorded), case: :lower)
     refute File.exists?(Path.dirname(metadata.archive))
     assert_receive {:consumer_calls, calls}
 
@@ -177,9 +178,8 @@ defmodule UnicodeSecurity.ReleaseCandidatePackageTest do
     assert_receive {:command, ["hex.build", "--output", archive], build_options}
     assert archive == metadata.archive
     assert build_options[:cd] == context.root
-    assert_receive {:command, ["hex.build", "--unpack", "--output", unpacked], unpack_options}
-    assert unpacked == Path.join(temporary, "package")
-    assert unpack_options[:cd] == context.root
+    unpacked = Path.join(temporary, "package")
+    refute_receive {:command, ["hex.build", "--unpack" | _], _}
 
     for {key, relative} <- [
           {"MIX_HOME", "mix"},
@@ -191,7 +191,6 @@ defmodule UnicodeSecurity.ReleaseCandidatePackageTest do
     end
 
     assert List.keyfind(build_options[:env], "MIX_ENV", 0) == {"MIX_ENV", "prod"}
-    assert unpack_options[:env] == build_options[:env]
     assert_receive {:project, project}
     assert project =~ "{:unicode_security, path: #{inspect(unpacked)}}"
 
@@ -210,7 +209,7 @@ defmodule UnicodeSecurity.ReleaseCandidatePackageTest do
 
   # Breaks: continuing after command failure, losing diagnostics, or leaking temporary state.
   test "removes the temporary root when build unpack or consumer execution fails", context do
-    for failure <- [:build, :unpack, :deps, :compile, :run] do
+    for failure <- [:build, :deps, :compile, :run] do
       owner = self()
 
       boundary =
@@ -232,6 +231,20 @@ defmodule UnicodeSecurity.ReleaseCandidatePackageTest do
       temporary = env |> List.keyfind("MIX_HOME", 0) |> elem(1) |> Path.dirname()
       refute File.exists?(temporary)
     end
+
+    owner = self()
+
+    boundary = fn _, ["hex.build", "--output", archive], _ ->
+      File.write!(archive, "not a tarball")
+      send(owner, {:bad_archive, archive})
+      {"ok", 0}
+    end
+
+    assert {:error, %{reason: :unpack}} =
+             Package.verify(context.root, cmd: boundary, tmp_dir: context.directory)
+
+    assert_receive {:bad_archive, archive}
+    refute File.exists?(Path.dirname(archive))
   end
 
   # Breaks: rescuing an exception without releasing files owned by the verifier.
@@ -289,16 +302,172 @@ defmodule UnicodeSecurity.ReleaseCandidatePackageTest do
     for root <- roots, do: refute(File.exists?(root))
   end
 
+  # Breaks: inspecting an independently rebuilt tree rather than the recorded archive.
+  test "rejects forbidden files present only in the recorded archive", context do
+    hex_tar!(context.archive, context.unpacked, [{~c"priv/source.txt", "archive-only data"}])
+    recorded = File.read!(context.archive)
+    owner = self()
+
+    boundary = fn _, args, _ ->
+      case args do
+        ["hex.build", "--output", archive] ->
+          File.write!(archive, recorded)
+          send(owner, {:recorded_archive, archive})
+
+        ["hex.build", "--unpack", "--output", unpacked] ->
+          File.cp_r!(context.unpacked, unpacked)
+
+        _ ->
+          :ok
+      end
+
+      {"ok", 0}
+    end
+
+    assert {:error, %{reason: :payload_files, unexpected: ["priv/source.txt"], missing: []}} =
+             Package.verify(context.root, cmd: boundary, tmp_dir: context.directory)
+
+    assert_receive {:recorded_archive, archive}
+    refute File.exists?(Path.dirname(archive))
+  end
+
+  # Breaks: the consumer using different file bytes from those covered by the digest.
+  test "consumer uses the file bytes covered by the recorded archive digest", context do
+    write!(context.unpacked, "README.md", "archived release")
+    hex_tar!(context.archive, context.unpacked)
+    recorded = File.read!(context.archive)
+    write!(context.unpacked, "README.md", "independent rebuild")
+    owner = self()
+
+    boundary = fn _, args, options ->
+      case args do
+        ["hex.build", "--output", archive] ->
+          File.write!(archive, recorded)
+
+        ["hex.build", "--unpack", "--output", unpacked] ->
+          File.cp_r!(context.unpacked, unpacked)
+
+        ["run", "--no-compile", "consumer.exs"] ->
+          package = Path.join(Path.dirname(options[:cd]), "package")
+          send(owner, {:consumed_readme, File.read!(Path.join(package, "README.md"))})
+
+        _ ->
+          :ok
+      end
+
+      {"ok", 0}
+    end
+
+    assert {:ok, metadata} =
+             Package.verify(context.root, cmd: boundary, tmp_dir: context.directory)
+
+    assert metadata.bytes == byte_size(recorded)
+    assert metadata.sha256 == Base.encode16(:crypto.hash(:sha256, recorded), case: :lower)
+    assert_receive {:consumed_readme, "archived release"}
+    refute File.exists?(Path.dirname(metadata.archive))
+  end
+
+  # Breaks: converting a failed authoritative Git command into unstructured exception text.
+  test "preserves Git status 128 argv output and duration through verification", context do
+    File.rm_rf!(Path.join(context.root, ".git"))
+    owner = self()
+
+    boundary =
+      build_boundary(context, fn args, _ ->
+        send(owner, {:before_git_failure, args})
+        {"ok", 0}
+      end)
+
+    assert {:error, metadata} =
+             Package.verify(context.root, cmd: boundary, tmp_dir: context.directory)
+
+    assert %{
+             argv: ["git", "ls-files", "-z", "--", "lib"],
+             status: 128,
+             output: output,
+             duration_ms: duration
+           } = metadata
+
+    assert output =~ "not a git repository"
+    assert is_integer(duration) and duration >= 0
+    assert_receive {:before_git_failure, ["hex.build", "--output", archive]}
+    refute_receive {:before_git_failure, _}
+    refute File.exists?(Path.dirname(archive))
+  end
+
+  # Breaks: in-memory tar extraction silently omitting archived symbolic links.
+  test "rejects archived links instead of silently omitting them from validation", context do
+    link = Path.join(context.directory, "extra-link")
+    File.ln_s!(Path.join(context.unpacked, "README.md"), link)
+    hex_tar!(context.archive, context.unpacked, [{~c"priv/extra-link", String.to_charlist(link)}])
+    recorded = File.read!(context.archive)
+    owner = self()
+
+    boundary = fn _, args, _ ->
+      case args do
+        ["hex.build", "--output", archive] ->
+          File.write!(archive, recorded)
+          send(owner, {:linked_archive, archive})
+
+        _ ->
+          :ok
+      end
+
+      {"ok", 0}
+    end
+
+    assert {:error, %{reason: :unpack}} =
+             Package.verify(context.root, cmd: boundary, tmp_dir: context.directory)
+
+    assert_receive {:linked_archive, archive}
+    refute File.exists?(Path.dirname(archive))
+  end
+
+  defp hex_tar!(archive, unpacked, extras \\ []) do
+    contents = archive <> ".contents.tar.gz"
+
+    entries =
+      for path <- @files -- ["hex_metadata.config"],
+          do: {String.to_charlist(path), File.read!(Path.join(unpacked, path))}
+
+    :ok = :erl_tar.create(String.to_charlist(contents), entries ++ extras, [:compressed])
+    compressed = File.read!(contents)
+    metadata = File.read!(Path.join(unpacked, "hex_metadata.config"))
+    checksum = :crypto.hash(:sha256, "3" <> metadata <> compressed) |> Base.encode16()
+
+    :ok =
+      :erl_tar.create(
+        String.to_charlist(archive),
+        [
+          {~c"VERSION", "3"},
+          {~c"CHECKSUM", checksum},
+          {~c"metadata.config", metadata},
+          {~c"contents.tar.gz", compressed}
+        ],
+        []
+      )
+
+    File.rm!(contents)
+  end
+
   defp build_boundary(context, consumer) do
+    owner = self()
+
     fn executable, args, options ->
       assert Path.basename(executable) == "mix"
       result = consumer.(args, options)
 
       if elem(result, 1) == 0 do
         case args do
-          ["hex.build", "--output", path] -> File.write!(path, "abc")
-          ["hex.build", "--unpack", "--output", path] -> File.cp_r!(context.unpacked, path)
-          _ -> :ok
+          ["hex.build", "--output", path] ->
+            hex_tar!(path, context.unpacked)
+            send(owner, {:built_tarball, File.read!(path)})
+
+          ["hex.build", "--unpack", "--output", path] ->
+            File.cp_r!(context.unpacked, path)
+
+          _ ->
+            :ok
         end
       end
 
