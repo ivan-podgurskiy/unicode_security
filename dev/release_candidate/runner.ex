@@ -114,9 +114,40 @@ defmodule UnicodeSecurity.ReleaseCandidate.Runner do
           }
       end
 
+    report = verify_commit(root, report)
     report = %{report | finished_at: timestamp()}
     Report.write!(path, report)
     if report.status == :passed, do: {:ok, report}, else: {:error, report}
+  end
+
+  defp verify_commit(_root, %{commit: ""} = report), do: report
+
+  defp verify_commit(root, report) do
+    case Command.run(root, "git", ["rev-parse", "HEAD"]) do
+      {:ok, result} ->
+        actual_commit = String.trim(result.output)
+
+        if actual_commit == report.commit do
+          report
+        else
+          result =
+            Map.merge(result, %{expected_commit: report.commit, actual_commit: actual_commit})
+
+          commit_failure(report, result)
+        end
+
+      {:error, result} ->
+        commit_failure(report, result)
+    end
+  end
+
+  defp commit_failure(report, result) do
+    %{
+      report
+      | status: :failed,
+        stages: report.stages ++ [entry(:repository_commit, :failed, result, result.duration_ms)],
+        repository: %{report.repository | unchanged?: false}
+    }
   end
 
   defp entry(name, status, result, duration),

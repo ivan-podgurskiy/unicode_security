@@ -160,6 +160,35 @@ defmodule UnicodeSecurity.ReleaseCandidateRunnerTest do
     assert read_report(context.report_path) == report
   end
 
+  # Breaks: certifying a different clean commit under the captured source commit.
+  test "fails when a successful stage changes HEAD while leaving status clean", context do
+    before = String.trim(git!(context.root, ["rev-parse", "HEAD"]))
+
+    stage = %{
+      name: :committing,
+      run: fn %{root: root} ->
+        git!(root, ["commit", "--quiet", "--allow-empty", "-m", "unexpected commit"])
+        {:ok, %{output: "child passed"}}
+      end
+    }
+
+    assert {:error, report} = Runner.run(options(context, [stage]))
+    after_commit = String.trim(git!(context.root, ["rev-parse", "HEAD"]))
+    refute after_commit == before
+    assert report.status == :failed
+    assert report.commit == before
+    assert report.repository == %{before: "", after: "", unchanged?: false}
+
+    assert [
+             %{name: :committing, status: :passed},
+             %{name: :repository_commit, status: :failed, result: result}
+           ] = report.stages
+
+    assert result.expected_commit == before
+    assert result.actual_commit == after_commit
+    assert read_report(context.report_path) == report
+  end
+
   # Breaks: reporting success when writing evidence itself dirties the repository.
   test "includes the report file in the final repository comparison", context do
     context = %{context | report_path: Path.join(context.root, "report.term")}
@@ -179,6 +208,66 @@ defmodule UnicodeSecurity.ReleaseCandidateRunnerTest do
     bytes = File.read!(context.report_path)
     assert :ok = Report.write!(context.report_path, report)
     assert File.read!(context.report_path) == bytes
+    assert File.ls!(Path.dirname(context.report_path)) == ["report.term"]
+  end
+
+  # Breaks: removing a temporary file owned by another VM after exclusive creation fails.
+  test "preserves another writer's temporary file on a creation collision", context do
+    source = Path.expand("dev/release_candidate/report.ex")
+
+    script = ~S"""
+    [path] = System.argv()
+    File.mkdir_p!(Path.dirname(path))
+    File.write!(path, :erlang.term_to_binary(%{status: :passed, generation: :previous}))
+    next = System.unique_integer([:positive, :monotonic]) + 1
+    temporary = path <> ".#{next}.tmp"
+    File.write!(temporary, "another writer's unfinished bytes")
+
+    try do
+      UnicodeSecurity.ReleaseCandidate.Report.write!(path, %{status: :passed, generation: :next})
+    rescue
+      error in File.Error ->
+        if error.reason != :eexist, do: reraise(error, __STACKTRACE__)
+    end
+
+    if File.read(temporary) != {:ok, "another writer's unfinished bytes"}, do: System.halt(1)
+    if File.read!(path) |> :erlang.binary_to_term() != %{status: :passed, generation: :previous}, do: System.halt(2)
+    IO.puts("previous report and other writer preserved")
+    """
+
+    assert {"previous report and other writer preserved\n", 0} =
+             System.cmd(
+               System.find_executable("elixir"),
+               ["-r", source, "-e", script, context.report_path],
+               stderr_to_stdout: true
+             )
+  end
+
+  # Breaks: publishing in-place writes that let independent readers observe partial bytes.
+  # Windows rename may briefly remove the destination; :enoent is permitted during replacement.
+  test "concurrent raw readers see only complete reports or a missing destination", context do
+    reports =
+      for generation <- 1..40,
+          do: %{generation: generation, payload: String.duplicate("report bytes", 10_000)}
+
+    assert :ok = Report.write!(context.report_path, hd(reports))
+    allowed = MapSet.new(reports)
+    owner = self()
+
+    writer =
+      Task.async(fn ->
+        receive do
+          :start ->
+            for report <- reports, do: Report.write!(context.report_path, report)
+            send(owner, :reports_written)
+        end
+      end)
+
+    send(writer.pid, :start)
+    observed = read_while_writing(context.report_path, allowed, 0)
+    assert observed > 0
+    Task.await(writer, 10_000)
+    assert read_report(context.report_path) == List.last(reports)
     assert File.ls!(Path.dirname(context.report_path)) == ["report.term"]
   end
 
@@ -238,6 +327,36 @@ defmodule UnicodeSecurity.ReleaseCandidateRunnerTest do
     do: [root: context.root, version: "0.1.0", report_path: context.report_path, stages: stages]
 
   defp read_report(path), do: path |> File.read!() |> :erlang.binary_to_term()
+
+  defp read_while_writing(path, allowed, observed) do
+    receive do
+      :reports_written -> observed
+    after
+      0 ->
+        case raw_read(path) do
+          {:ok, bytes} ->
+            assert MapSet.member?(allowed, :erlang.binary_to_term(bytes))
+            read_while_writing(path, allowed, observed + 1)
+
+          {:error, :enoent} ->
+            read_while_writing(path, allowed, observed)
+        end
+    end
+  end
+
+  defp raw_read(path) do
+    case :file.open(String.to_charlist(path), [:read, :binary, :raw]) do
+      {:ok, file} ->
+        try do
+          :file.read(file, 1_000_000)
+        after
+          :file.close(file)
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
 
   defp git!(root, args) do
     {output, 0} = System.cmd("git", args, cd: root, stderr_to_stdout: true)
