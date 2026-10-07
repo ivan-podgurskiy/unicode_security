@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- M5C release-candidate hardening: repeatable `mix rc` qualification with full
+  coverage, fixed-seed property smoke, isolated Hex archive and production-consumer
+  validation, publication dry-run, and commit-bound evidence. A read-only manual
+  hosted gate waits for the full compatibility matrix; the release checklist
+  keeps hosted execution, finalization, tagging, and publication separately authorized.
 - M5A final-data qualification: all 21 Unicode 18.0.0 inputs now use immutable,
   versioned URLs, and the quality gate runs the passing release-data check after
   generated-data verification. Finalization changed only a Bidi comment and

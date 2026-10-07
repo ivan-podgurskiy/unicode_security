@@ -105,6 +105,57 @@ defmodule UnicodeSecurity.ProjectTest do
     end
   end
 
+  test "offers a manual release candidate workflow after the full matrix" do
+    workflow = File.read!(".github/workflows/ci.yml")
+
+    assert workflow =~ ~r/^  workflow_dispatch:\s*$/m
+    assert [_, job] = Regex.run(~r/^  release_candidate:\n(.*?)(?=^  \w+:|\z)/ms, workflow)
+    assert job =~ ~r/^    needs: test$/m
+    assert job =~ ~r/^    if: github\.event_name == 'workflow_dispatch'$/m
+    assert job =~ ~r/^    runs-on: ubuntu-latest$/m
+    assert job =~ "elixir-version: '1.20'"
+    assert job =~ "otp-version: '29'"
+    assert job =~ "mix rc --report tmp/release-candidate.term"
+  end
+
+  test "keeps release candidate workflow permissions read only and has no publish command" do
+    workflow = File.read!(".github/workflows/ci.yml")
+
+    assert workflow =~ ~r/^permissions:\n  contents: read\n/m
+    assert workflow =~ ~r/^  release_candidate:/m
+    refute workflow =~ ~r/\bwrite\b|write-all/
+    refute workflow =~ "hex.publish --yes"
+    refute workflow =~ ~r/hex\.publish(?! --dry-run)/
+    refute workflow =~ ~r/secrets\.|HEX_API_KEY|HEX_API_TOKEN|GITHUB_TOKEN|GH_TOKEN/
+  end
+
+  test "documents every separately authorized release transition" do
+    assert File.regular?("RELEASE_CHECKLIST.md")
+    checklist = File.read!("RELEASE_CHECKLIST.md")
+
+    for state <- [
+          "Local candidate",
+          "Hosted candidate",
+          "Finalized candidate",
+          "Tagged release",
+          "Published release"
+        ] do
+      assert checklist =~ state
+    end
+
+    for boundary <- ["push", "workflow_dispatch", "changelog", "tag", "Hex", "GitHub Release"] do
+      assert checklist =~ boundary
+    end
+
+    assert checklist =~ "authorization"
+    assert checklist =~ "mix rc --report"
+    assert checklist =~ "git rev-parse"
+    assert checklist =~ "2026-10-07"
+    assert checklist =~ "404"
+    assert checklist =~ "fresh"
+    assert File.read!("CHANGELOG.md") =~ "## [0.1.0] - Unreleased"
+  end
+
   test "Windows checkout preserves the exact bytes of vendored Unicode inputs" do
     source_directory = Source.directory(File.cwd!()) |> Path.relative_to(File.cwd!())
 

@@ -3,6 +3,7 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -92,3 +93,24 @@ jobs:
         run: mix run bench/milestone_3.exs
       - if: matrix.quality
         run: mix run bench/milestone_4.exs
+
+  release_candidate:
+    name: Manual release candidate
+    needs: test
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: '1.20'
+          otp-version: '29'
+      - uses: actions/cache@v6
+        with:
+          path: |
+            deps
+            _build
+            priv/plts
+          key: mix-${{ runner.os }}-${{ runner.arch }}-1.20-29-${{ hashFiles('mix.lock', 'mix.exs') }}
+      - run: mix deps.get
+      - run: mix rc --report tmp/release-candidate.term
