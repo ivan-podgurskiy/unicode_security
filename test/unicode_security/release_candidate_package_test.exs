@@ -476,24 +476,26 @@ defmodule UnicodeSecurity.ReleaseCandidatePackageTest do
     fn executable, args, options ->
       assert Path.basename(executable) == "mix"
       result = consumer.(args, options)
-
-      if elem(result, 1) == 0 do
-        case args do
-          ["hex.build", "--output", path] ->
-            hex_tar!(path, context.unpacked)
-            send(owner, {:built_tarball, File.read!(path)})
-
-          ["hex.build", "--unpack", "--output", path] ->
-            File.cp_r!(context.unpacked, path)
-
-          _ ->
-            :ok
-        end
-      end
-
+      complete_build(context, args, owner, result)
       result
     end
   end
+
+  defp complete_build(context, args, owner, {_, 0}) do
+    case args do
+      ["hex.build", "--output", path] ->
+        hex_tar!(path, context.unpacked)
+        send(owner, {:built_tarball, File.read!(path)})
+
+      ["hex.build", "--unpack", "--output", path] ->
+        File.cp_r!(context.unpacked, path)
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp complete_build(_context, _args, _owner, _result), do: :ok
 
   defp command_stage(["hex.build", "--unpack" | _]), do: :unpack
   defp command_stage(["hex.build" | _]), do: :build

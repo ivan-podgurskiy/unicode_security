@@ -135,9 +135,10 @@ defmodule UnicodeSecurity.ReleaseCandidate.Package do
 
   defp validate_tar_types(tarball, options) do
     with {:ok, entries} <- :erl_tar.table({:binary, tarball}, [:verbose | options]) do
-      if Enum.all?(entries, fn {_, type, _, _, _, _, _} -> type in [:regular, :directory] end),
-        do: :ok,
-        else: {:error, :unsupported_archive_entry_type}
+      supported? =
+        Enum.all?(entries, fn {_, type, _, _, _, _, _} -> type in [:regular, :directory] end)
+
+      if supported?, do: :ok, else: {:error, :unsupported_archive_entry_type}
     end
   end
 
