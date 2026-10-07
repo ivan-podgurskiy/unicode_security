@@ -11,6 +11,7 @@ defmodule UnicodeSecurity.MixProject do
       elixir: "~> 1.14",
       elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
+      aliases: [rc: "run scripts/release_candidate.exs"],
       name: "UnicodeSecurity",
       description: "Pinned Unicode identifier security properties and policy checks for Elixir.",
       package: package(),
