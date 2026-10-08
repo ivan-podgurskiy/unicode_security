@@ -139,10 +139,10 @@ defmodule UnicodeSecurity.ProjectTest do
     refute "ROADMAP.md" in project[:docs][:extras]
   end
 
-  test "changelog notes are public and still undated" do
+  test "changelog notes are public and dated" do
     changelog = File.read!("CHANGELOG.md")
 
-    assert changelog =~ "## [0.1.0] - Unreleased"
+    assert changelog =~ "## [0.1.0] - 2026-10-08"
     assert changelog =~ "UnicodeSecurity.skeleton/1"
     assert changelog =~ "check/2"
     assert changelog =~ "type: :domain"
