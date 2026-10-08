@@ -45,7 +45,7 @@ defmodule UnicodeSecurity.ProjectTest do
   end
 
   test "publishes the final-data quality and public documentation contract" do
-    workflow = File.read!(".github/workflows/ci.yml")
+    workflow = read_workflow()
 
     generated_data_check =
       "      - if: matrix.quality\n        run: mix run scripts/check_generated.exs"
@@ -106,7 +106,7 @@ defmodule UnicodeSecurity.ProjectTest do
   end
 
   test "offers a manual release candidate workflow after the full matrix" do
-    workflow = File.read!(".github/workflows/ci.yml")
+    workflow = read_workflow()
 
     assert workflow =~ ~r/^  workflow_dispatch:\s*$/m
     assert [_, job] = Regex.run(~r/^  release_candidate:\n(.*?)(?=^  \w+:|\z)/ms, workflow)
@@ -119,7 +119,7 @@ defmodule UnicodeSecurity.ProjectTest do
   end
 
   test "keeps release candidate workflow permissions read only and has no publish command" do
-    workflow = File.read!(".github/workflows/ci.yml")
+    workflow = read_workflow()
 
     assert workflow =~ ~r/^permissions:\n  contents: read\n/m
     assert workflow =~ ~r/^  release_candidate:/m
@@ -167,6 +167,12 @@ defmodule UnicodeSecurity.ProjectTest do
 
   test "Windows checkout preserves LF bytes of generated runtime modules" do
     assert_checkout_bytes(Path.wildcard("lib/unicode_security/data/*.ex"))
+  end
+
+  defp read_workflow do
+    ".github/workflows/ci.yml"
+    |> File.read!()
+    |> String.replace("\r\n", "\n")
   end
 
   defp assert_checkout_bytes(paths) do

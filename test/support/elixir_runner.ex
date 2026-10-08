@@ -8,8 +8,9 @@ defmodule UnicodeSecurity.Test.ElixirRunner do
     directory = Path.join(System.tmp_dir!(), "unicode security verifier #{suffix}")
     File.mkdir!(directory)
     path = Path.join(directory, "verification.exs")
+    {elixir_args, options} = Keyword.pop(options, :elixir_args, [])
     {paths, command_options} = Keyword.pop(options, :paths, [])
-    arguments = Enum.flat_map(paths, &["-pa", &1]) ++ [path]
+    arguments = elixir_args ++ Enum.flat_map(paths, &["-pa", &1]) ++ [path]
     executable = System.find_executable("elixir") || raise "elixir executable not found"
 
     try do

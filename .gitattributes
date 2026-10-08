@@ -5,3 +5,7 @@ priv/unicode/18.0.0-release.term -text
 
 # Offline regeneration compares these files byte-for-byte on every platform.
 lib/unicode_security/data/*.ex text eol=lf
+
+# Tests and CI match LF sequences. Windows checkout must not insert CR.
+*.exs text eol=lf
+.github/workflows/*.yml text eol=lf

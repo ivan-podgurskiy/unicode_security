@@ -13,8 +13,9 @@ defmodule UnicodeSecurity.IdnaFixturesTest do
   end
 
   test "surrogates and non-BMP escapes remain integer input" do
-    [surrogate, non_bmp] = IdnaFixtures.parse!(~S(\uD800; ; [V7]; ; [A3]; ;
-\x{1F600}; ; ; ; ; ;))
+    [surrogate, non_bmp] =
+      IdnaFixtures.parse!(~S(\uD800; ; [V7]; ; [A3]; ;) <> "\n" <> ~S(\x{1F600}; ; ; ; ; ;))
+
     assert surrogate.source == [0xD800]
     assert non_bmp.source == [0x1F600]
   end

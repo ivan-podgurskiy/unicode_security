@@ -1,6 +1,7 @@
 defmodule UnicodeSecurity.SourceTest do
   use ExUnit.Case, async: true
 
+  alias UnicodeSecurity.Test.Paths
   alias UnicodeSecurity.UnicodeData.Source
 
   test "rejects a malformed surviving lock before writing recovery files" do
@@ -87,10 +88,11 @@ defmodule UnicodeSecurity.SourceTest do
       end
 
       rename = fn from, to ->
-        if (failure == :lock and to == lock_path) or
-             (failure == :fixtures and to == directory and String.contains?(from, ".staging-")) or
-             (failure == :fixtures_backup and from == directory) or
-             (failure == :lock_backup and from == lock_path) do
+        if (failure == :lock and Paths.same?(to, lock_path)) or
+             (failure == :fixtures and Paths.same?(to, directory) and
+                String.contains?(from, ".staging-")) or
+             (failure == :fixtures_backup and Paths.same?(from, directory)) or
+             (failure == :lock_backup and Paths.same?(from, lock_path)) do
           raise "injected rename failure"
         end
 

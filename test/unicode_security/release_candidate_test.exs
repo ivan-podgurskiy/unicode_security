@@ -2,6 +2,7 @@ defmodule UnicodeSecurity.ReleaseCandidateTest do
   use ExUnit.Case, async: false
 
   alias UnicodeSecurity.ReleaseCandidate
+  alias UnicodeSecurity.Test.Paths
 
   setup do
     root =
@@ -126,7 +127,7 @@ defmodule UnicodeSecurity.ReleaseCandidateTest do
 
       case args do
         ["hex.build", "--output", archive] ->
-          assert opts[:cd] == root
+          assert Paths.same?(opts[:cd], root)
           File.write!(archive, bytes)
 
         ["run", "--no-compile", "consumer.exs"] ->
@@ -167,7 +168,7 @@ defmodule UnicodeSecurity.ReleaseCandidateTest do
         ] do
       assert_receive {:package_command, ^args, opts}
       assert opts[:env] == build_opts[:env]
-      assert opts[:cd] == Path.join(Path.dirname(archive), "consumer")
+      assert Paths.same?(opts[:cd], Path.join(Path.dirname(archive), "consumer"))
     end
   end
 
@@ -197,7 +198,7 @@ defmodule UnicodeSecurity.ReleaseCandidateTest do
     assert result.output == "package build failed"
     assert ["mix", "hex.build", "--output", archive] = result.argv
     assert_receive {:failed_package_command, ["hex.build", "--output", ^archive], opts}
-    assert opts[:cd] == root
+    assert Paths.same?(opts[:cd], root)
     refute File.exists?(Path.dirname(archive))
     refute_receive :unexpected_stage
     assert report.repository.unchanged?

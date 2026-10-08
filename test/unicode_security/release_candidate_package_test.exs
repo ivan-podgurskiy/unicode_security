@@ -4,6 +4,7 @@ defmodule UnicodeSecurity.ReleaseCandidatePackageTest do
   import ExUnit.CaptureIO
 
   alias UnicodeSecurity.ReleaseCandidate.{Package, Report, Runner}
+  alias UnicodeSecurity.Test.{ElixirRunner, Paths}
 
   @files Enum.sort(
            ~w(.formatter.exs CHANGELOG.md LICENSE README.md THIRD_PARTY_NOTICES.md hex_metadata.config mix.exs lib/example.ex lib/nested/child.ex)
@@ -173,11 +174,11 @@ defmodule UnicodeSecurity.ReleaseCandidatePackageTest do
              Package.verify(context.root, cmd: boundary, tmp_dir: context.directory)
 
     temporary = Path.dirname(metadata.archive)
-    assert Path.dirname(temporary) == context.directory
+    assert Paths.same?(Path.dirname(temporary), context.directory)
     assert Path.basename(metadata.archive) == "package.tar"
     assert_receive {:command, ["hex.build", "--output", archive], build_options}
     assert archive == metadata.archive
-    assert build_options[:cd] == context.root
+    assert Paths.same?(build_options[:cd], context.root)
     unpacked = Path.join(temporary, "package")
     refute_receive {:command, ["hex.build", "--unpack" | _], _}
 
@@ -187,12 +188,15 @@ defmodule UnicodeSecurity.ReleaseCandidatePackageTest do
           {"MIX_DEPS_PATH", "deps"},
           {"MIX_BUILD_PATH", "build"}
         ] do
-      assert List.keyfind(build_options[:env], key, 0) == {key, Path.join(temporary, relative)}
+      assert {^key, path} = List.keyfind(build_options[:env], key, 0)
+      assert Paths.same?(path, Path.join(temporary, relative))
     end
 
     assert List.keyfind(build_options[:env], "MIX_ENV", 0) == {"MIX_ENV", "prod"}
     assert_receive {:project, project}
-    assert project =~ "{:unicode_security, path: #{inspect(unpacked)}}"
+    assert [_, quoted_path] = Regex.run(~r/path: ("(?:\\.|[^"\\])*")/, project)
+    assert {dependency, []} = Code.eval_string(quoted_path)
+    assert Paths.same?(dependency, unpacked)
 
     for args <- [
           ["deps.get", "--only", "prod"],
@@ -200,7 +204,7 @@ defmodule UnicodeSecurity.ReleaseCandidatePackageTest do
           ["run", "--no-compile", "consumer.exs"]
         ] do
       assert_receive {:command, ^args, options}
-      assert options[:cd] == Path.join(temporary, "consumer")
+      assert Paths.same?(options[:cd], Path.join(temporary, "consumer"))
       assert options[:env] == build_options[:env]
     end
 
@@ -301,7 +305,7 @@ defmodule UnicodeSecurity.ReleaseCandidatePackageTest do
     assert ["mix", "hex.build", "--output", archive] = result.argv
     assert result.duration_ms >= 0
     assert result.cleanup.reason == :exception
-    assert result.cleanup.path == Path.dirname(archive)
+    assert Paths.same?(result.cleanup.path, Path.dirname(archive))
     assert result.cleanup.output =~ "permission denied"
   end
 
@@ -318,7 +322,9 @@ defmodule UnicodeSecurity.ReleaseCandidatePackageTest do
 
     assert result.reason == :cleanup_failed
     assert result.consumer == :passed
-    assert result.cleanup == %{reason: :eacces, path: Path.dirname(result.archive)}
+    assert %{reason: :eacces, path: path} = result.cleanup
+    assert map_size(result.cleanup) == 2
+    assert Paths.same?(path, Path.dirname(result.archive))
   end
 
   test "package cleanup catches exits and throws without replacing original failure", context do
@@ -434,7 +440,8 @@ defmodule UnicodeSecurity.ReleaseCandidatePackageTest do
   end
 
   # Breaks: private Hex bootstrapping or a fresh consumer unable to compile the real payload.
-  @tag timeout: 120_000
+  # Windows runners spend several minutes in the real Mix commands.
+  @tag timeout: 300_000
   test "builds and compiles the actual package in a fresh production consumer" do
     assert {:ok, metadata} = Package.verify(Path.expand("."))
     assert metadata.consumer == :passed
@@ -460,10 +467,11 @@ defmodule UnicodeSecurity.ReleaseCandidatePackageTest do
 
     roots =
       for _ <- 1..2 do
-        {output, 0} =
-          System.cmd("elixir", ["--erl", "+S 1", "-e", script], stderr_to_stdout: true)
+        {output, 0} = ElixirRunner.run(script, elixir_args: ["--erl", "+S 1"])
 
-        String.trim(output)
+        output
+        |> String.split(~r/\r?\n/, trim: true)
+        |> List.last()
       end
 
     assert length(Enum.uniq(roots)) == 2

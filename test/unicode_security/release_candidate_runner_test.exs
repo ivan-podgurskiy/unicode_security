@@ -2,6 +2,7 @@ defmodule UnicodeSecurity.ReleaseCandidateRunnerTest do
   use ExUnit.Case, async: true
 
   alias UnicodeSecurity.ReleaseCandidate.{Command, Report, Runner}
+  alias UnicodeSecurity.Test.ElixirRunner
 
   setup do
     directory =
@@ -285,12 +286,13 @@ defmodule UnicodeSecurity.ReleaseCandidateRunnerTest do
   test "preserves another writer's temporary file on a creation collision", context do
     source = Path.expand("dev/release_candidate/report.ex")
 
-    script = ~S"""
-    [path] = System.argv()
+    script = """
+    Code.require_file(#{inspect(source)})
+    path = #{inspect(context.report_path)}
     File.mkdir_p!(Path.dirname(path))
     File.write!(path, :erlang.term_to_binary(%{status: :passed, generation: :previous}))
     next = System.unique_integer([:positive, :monotonic]) + 1
-    temporary = path <> ".#{next}.tmp"
+    temporary = path <> "." <> Integer.to_string(next) <> ".tmp"
     File.write!(temporary, "another writer's unfinished bytes")
 
     try do
@@ -305,12 +307,7 @@ defmodule UnicodeSecurity.ReleaseCandidateRunnerTest do
     IO.puts("previous report and other writer preserved")
     """
 
-    assert {"previous report and other writer preserved\n", 0} =
-             System.cmd(
-               System.find_executable("elixir"),
-               ["-r", source, "-e", script, context.report_path],
-               stderr_to_stdout: true
-             )
+    assert {"previous report and other writer preserved\n", 0} = ElixirRunner.run(script)
   end
 
   # Breaks: publishing in-place writes that let independent readers observe partial bytes.
