@@ -73,7 +73,7 @@ defmodule UnicodeSecurity.ReleaseCandidateTest do
 
     for stage <- stages do
       expected = if stage.name == :coverage or Map.has_key?(stage, :seed), do: "test", else: "dev"
-      assert stage.env == [{"MIX_ENV", expected}]
+      assert List.keyfind(stage.env, "MIX_ENV", 0) == {"MIX_ENV", expected}
       assert is_function(stage.run, 1)
     end
 
@@ -84,7 +84,24 @@ defmodule UnicodeSecurity.ReleaseCandidateTest do
     assert by_name.credo.args == ["credo", "--strict"]
     assert by_name.dialyzer.args == ["dialyzer", "--format", "github"]
     assert by_name.docs.args == ["docs", "--warnings-as-errors"]
-    assert by_name.hex_publish_dry_run.args == ["hex.publish", "--dry-run"]
+
+    assert by_name.hex_publish_dry_run.args == [
+             "do",
+             "hex.publish",
+             "--dry-run",
+             "--yes",
+             "+",
+             "run",
+             "--no-compile",
+             "-e",
+             "IO.puts(\"unicode-security-hex-dry-run-complete\")"
+           ]
+
+    assert by_name.hex_publish_dry_run.env == [
+             {"MIX_ENV", "dev"},
+             {"HEX_API_KEY", "unicode-security-invalid-dry-run-sentinel"},
+             {"HEX_API_URL", "http://127.0.0.1:1"}
+           ]
 
     for {name, path} <- [
           sources: "scripts/fetch_unicode_data.exs",
@@ -283,7 +300,8 @@ defmodule UnicodeSecurity.ReleaseCandidateTest do
 
     context = %{root: root, seeds: [], command_opts: [cmd: boundary]}
 
-    for stage <- ReleaseCandidate.default_stages(), stage.name != :package do
+    for stage <- ReleaseCandidate.default_stages(),
+        stage.name not in [:package, :hex_publish_dry_run] do
       assert {:ok, result} = stage.run.(context)
       assert_receive {:command, args, opts}
       assert args == stage.args
@@ -300,6 +318,81 @@ defmodule UnicodeSecurity.ReleaseCandidateTest do
     assert result.seed == 34
     assert result.status == 9
     assert result.output == "seed failed"
+  end
+
+  test "Hex preflight requires completion after the official isolated dry-run", %{root: root} do
+    stage = Enum.find(ReleaseCandidate.default_stages(), &(&1.name == :hex_publish_dry_run))
+    owner = self()
+
+    for {output, status, expected} <- [
+          {"authentication prompt\nSIGTERM received - shutting down\n", 0, :error},
+          {"unicode-security-hex-dry-run-complete\n", 0, :ok},
+          {"unicode-security-hex-dry-run-complete\n", 23, :error}
+        ] do
+      boundary = fn _executable, args, opts ->
+        send(owner, {:hex_command, args, opts})
+        {output, status}
+      end
+
+      assert {^expected, result} = stage.run.(%{root: root, command_opts: [cmd: boundary]})
+      assert_receive {:hex_command, args, opts}
+      assert args == stage.args
+      assert result.argv == ["mix" | stage.args]
+      assert result.output == output
+      assert result.status == status
+
+      assert List.keyfind(opts[:env], "HEX_API_KEY", 0) ==
+               {"HEX_API_KEY", "unicode-security-invalid-dry-run-sentinel"}
+
+      assert List.keyfind(opts[:env], "HEX_API_URL", 0) == {"HEX_API_URL", "http://127.0.0.1:1"}
+      assert {"HEX_HOME", home} = List.keyfind(opts[:env], "HEX_HOME", 0)
+      refute File.exists?(home)
+      if expected == :error and status == 0, do: assert(result.reason == :incomplete_hex_dry_run)
+    end
+  end
+
+  test "Hex preflight reports cleanup failure instead of certifying leaked state", %{root: root} do
+    stage = Enum.find(ReleaseCandidate.default_stages(), &(&1.name == :hex_publish_dry_run))
+    owner = self()
+
+    cleanup = fn path ->
+      send(owner, {:leaked_hex_home, path})
+      {:error, :eacces, path}
+    end
+
+    boundary = fn _, _, _ -> {"unicode-security-hex-dry-run-complete\n", 0} end
+
+    assert {:error, result} =
+             stage.run.(%{
+               root: root,
+               command_opts: [cmd: boundary],
+               hex_opts: [cleanup: cleanup]
+             })
+
+    assert result.reason == :hex_home_cleanup
+    assert result.cleanup_error == :eacces
+    assert_receive {:leaked_hex_home, home}
+    assert result.cleanup_path == home
+    assert File.dir?(home)
+    File.rm_rf!(home)
+  end
+
+  test "Hex preflight cleans isolated configuration when its process boundary raises", %{
+    root: root
+  } do
+    stage = Enum.find(ReleaseCandidate.default_stages(), &(&1.name == :hex_publish_dry_run))
+    owner = self()
+
+    boundary = fn _, _, opts ->
+      send(owner, {:hex_home, List.keyfind(opts[:env], "HEX_HOME", 0)})
+      raise "Hex boundary failed"
+    end
+
+    assert {:error, result} = stage.run.(%{root: root, command_opts: [cmd: boundary]})
+    assert result.reason == :hex_preflight_exception
+    assert result.output =~ "Hex boundary failed"
+    assert_receive {:hex_home, {"HEX_HOME", home}}
+    refute File.exists?(home)
   end
 
   defp package_stage(options) do

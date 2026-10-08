@@ -50,7 +50,7 @@ defmodule UnicodeSecurity.ReleaseCandidate do
         command(benchmark_name(milestone), ["run", "bench/milestone_#{milestone}.exs"])
       end) ++
       Enum.map(@property_seeds, &property_stage/1) ++
-      [package_stage(), command(:hex_publish_dry_run, ["hex.publish", "--dry-run"])]
+      [package_stage(), hex_publish_stage()]
   end
 
   defp command(name, args, environment \\ "dev") do
@@ -100,6 +100,83 @@ defmodule UnicodeSecurity.ReleaseCandidate do
       end
     }
   end
+
+  defp hex_publish_stage do
+    args = [
+      "do",
+      "hex.publish",
+      "--dry-run",
+      "--yes",
+      "+",
+      "run",
+      "--no-compile",
+      "-e",
+      "IO.puts(\"unicode-security-hex-dry-run-complete\")"
+    ]
+
+    env = [
+      {"MIX_ENV", "dev"},
+      {"HEX_API_KEY", "unicode-security-invalid-dry-run-sentinel"},
+      {"HEX_API_URL", "http://127.0.0.1:1"}
+    ]
+
+    %{
+      name: :hex_publish_dry_run,
+      args: args,
+      env: env,
+      run: fn context -> run_hex_publish(context, args, env) end
+    }
+  end
+
+  defp run_hex_publish(context, args, env) do
+    home =
+      Path.join(
+        System.tmp_dir!(),
+        "unicode-security-hex-dry-run-#{Base.encode16(:crypto.strong_rand_bytes(16), case: :lower)}"
+      )
+
+    opts = Keyword.put(Map.get(context, :command_opts, []), :env, env ++ [{"HEX_HOME", home}])
+
+    result =
+      try do
+        File.mkdir_p!(home)
+        validate_hex_completion(Command.run(context.root, "mix", args, opts))
+      rescue
+        exception ->
+          {:error,
+           %{
+             reason: :hex_preflight_exception,
+             argv: ["mix" | args],
+             status: 1,
+             output: Exception.format(:error, exception, __STACKTRACE__)
+           }}
+      end
+
+    cleanup = context |> Map.get(:hex_opts, []) |> Keyword.get(:cleanup, &File.rm_rf/1)
+
+    case cleanup.(home) do
+      {:ok, _} ->
+        result
+
+      {:error, reason, path} ->
+        {_, command_result} = result
+
+        {:error,
+         Map.merge(command_result, %{
+           reason: :hex_home_cleanup,
+           cleanup_error: reason,
+           cleanup_path: path
+         })}
+    end
+  end
+
+  defp validate_hex_completion({:ok, result}) do
+    if String.ends_with?(result.output, "unicode-security-hex-dry-run-complete\n"),
+      do: {:ok, result},
+      else: {:error, Map.put(result, :reason, :incomplete_hex_dry_run)}
+  end
+
+  defp validate_hex_completion({:error, _} = result), do: result
 
   defp benchmark_name(0), do: :benchmark_0
   defp benchmark_name(2), do: :benchmark_2

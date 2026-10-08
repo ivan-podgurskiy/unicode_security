@@ -22,6 +22,12 @@ Milestone 5C ends at the local candidate. Keep `CHANGELOG.md` at
 - [ ] Verify `git status --short` remains empty. Any failure creates a new
   candidate after a fix; rerun the entire gate without waivers or skipped stages.
 
+The RC's official Hex preflight runs `hex.publish --dry-run --yes` via `mix do`
+and prints a completion marker in the same process afterward. It uses a disposable
+`HEX_HOME`, a fixed invalid key sentinel, and `HEX_API_URL=http://127.0.0.1:1`.
+These are isolated test values, not publication credentials. The stage requires
+both a zero exit status and that final marker, and rejects cleanup failures.
+
 ## 2. Hosted candidate
 
 - [ ] Obtain separate authorization to push the local candidate, then run

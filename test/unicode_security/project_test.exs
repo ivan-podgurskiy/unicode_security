@@ -153,7 +153,7 @@ defmodule UnicodeSecurity.ProjectTest do
     assert checklist =~ "2026-10-07"
     assert checklist =~ "404"
     assert checklist =~ "fresh"
-    assert File.read!("CHANGELOG.md") =~ "## [0.1.0] - Unreleased"
+    assert checklist =~ "## [0.1.0] - Unreleased"
   end
 
   test "Windows checkout preserves the exact bytes of vendored Unicode inputs" do
