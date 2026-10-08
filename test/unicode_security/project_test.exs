@@ -129,6 +129,33 @@ defmodule UnicodeSecurity.ProjectTest do
     refute workflow =~ ~r/secrets\.|HEX_API_KEY|HEX_API_TOKEN|GITHUB_TOKEN|GH_TOKEN/
   end
 
+  test "readme matches the published git_trailers page shape" do
+    readme = File.read!("README.md")
+    words = readme |> String.split() |> length()
+    lines = readme |> String.split("\n") |> length()
+
+    assert words <= 400
+    assert lines <= 120
+
+    for badge <- [
+          "https://github.com/ivan-podgurskiy/unicode_security/actions/workflows/ci.yml/badge.svg",
+          "https://img.shields.io/hexpm/v/unicode_security.svg",
+          "https://img.shields.io/hexpm/dt/unicode_security.svg",
+          "https://img.shields.io/badge/docs-hexdocs-blue.svg",
+          "https://img.shields.io/badge/Elixir-1.14%2B-purple?logo=elixir&logoColor=white",
+          "https://img.shields.io/badge/License-MIT-yellow.svg"
+        ] do
+      assert readme =~ badge
+    end
+
+    assert readme =~ "{:unicode_security, \"~> 0.1\"}"
+    assert readme =~ "UnicodeSecurity.skeleton"
+    assert readme =~ "type: :domain"
+    refute readme =~ "Publication readiness"
+    refute readme =~ "mix credo"
+    refute readme =~ "Milestone"
+  end
+
   test "documents every separately authorized release transition" do
     assert File.regular?("RELEASE_CHECKLIST.md")
     checklist = File.read!("RELEASE_CHECKLIST.md")
