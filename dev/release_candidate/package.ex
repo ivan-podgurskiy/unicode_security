@@ -15,33 +15,70 @@ defmodule UnicodeSecurity.ReleaseCandidate.Package do
         "unicode-security-verification-#{Base.encode16(:crypto.strong_rand_bytes(16), case: :lower)}"
       )
 
-    try do
-      File.mkdir_p!(temporary)
-      env = private_environment(temporary)
-      copy_hex_archive(temporary)
-      command_opts = Keyword.put(opts, :env, env)
-      archive = Path.join(temporary, "package.tar")
-      unpacked = Path.join(temporary, "package")
-      consumer = Path.join(temporary, "consumer")
+    result =
+      try do
+        File.mkdir_p!(temporary)
+        env = private_environment(temporary)
+        copy_hex_archive(temporary)
+        command_opts = Keyword.put(opts, :env, env)
+        archive = Path.join(temporary, "package.tar")
+        unpacked = Path.join(temporary, "package")
+        consumer = Path.join(temporary, "consumer")
 
-      with {:ok, _} <- Command.run(root, "mix", ["hex.build", "--output", archive], command_opts),
-           {:ok, {archive_metadata, tarball}} <- read_archive(archive),
-           :ok <- unpack_archive(tarball, unpacked),
-           {:ok, metadata} <- validate_files(root, unpacked, archive_metadata),
-           :ok <- write_consumer(consumer, unpacked),
-           {:ok, _} <- Command.run(consumer, "mix", ["deps.get", "--only", "prod"], command_opts),
-           {:ok, _} <-
-             Command.run(consumer, "mix", ["compile", "--warnings-as-errors"], command_opts),
-           {:ok, _} <-
-             Command.run(consumer, "mix", ["run", "--no-compile", "consumer.exs"], command_opts) do
-        {:ok, Map.put(metadata, :consumer, :passed)}
+        with {:ok, _} <-
+               Command.run(root, "mix", ["hex.build", "--output", archive], command_opts),
+             {:ok, {archive_metadata, tarball}} <- read_archive(archive),
+             :ok <- unpack_archive(tarball, unpacked),
+             {:ok, metadata} <- validate_files(root, unpacked, archive_metadata),
+             :ok <- write_consumer(consumer, unpacked),
+             {:ok, _} <-
+               Command.run(consumer, "mix", ["deps.get", "--only", "prod"], command_opts),
+             {:ok, _} <-
+               Command.run(consumer, "mix", ["compile", "--warnings-as-errors"], command_opts),
+             {:ok, _} <-
+               Command.run(consumer, "mix", ["run", "--no-compile", "consumer.exs"], command_opts) do
+          {:ok, Map.put(metadata, :consumer, :passed)}
+        end
+      rescue
+        exception ->
+          {:error,
+           %{reason: :exception, output: Exception.format(:error, exception, __STACKTRACE__)}}
+      catch
+        kind, value ->
+          {:error, %{reason: kind, output: Exception.format(kind, value, __STACKTRACE__)}}
+      end
+
+    case {result, cleanup(temporary, opts)} do
+      {result, :ok} ->
+        result
+
+      {{:ok, metadata}, {:error, diagnostics}} ->
+        {:error, Map.merge(metadata, %{reason: :cleanup_failed, cleanup: diagnostics})}
+
+      {{:error, metadata}, {:error, diagnostics}} ->
+        {:error, Map.put(metadata, :cleanup, diagnostics)}
+    end
+  end
+
+  defp cleanup(temporary, opts) do
+    remove = Keyword.get(opts, :cleanup, &File.rm_rf/1)
+
+    try do
+      case remove.(temporary) do
+        {:ok, _} -> :ok
+        {:error, reason, path} -> {:error, %{reason: reason, path: path}}
       end
     rescue
       exception ->
         {:error,
-         %{reason: :exception, output: Exception.format(:error, exception, __STACKTRACE__)}}
-    after
-      File.rm_rf!(temporary)
+         %{
+           reason: :exception,
+           path: temporary,
+           output: Exception.format(:error, exception, __STACKTRACE__)
+         }}
+    catch
+      kind, value ->
+        {:error, %{reason: kind, path: temporary, output: "cleanup #{kind}: #{inspect(value)}"}}
     end
   end
 

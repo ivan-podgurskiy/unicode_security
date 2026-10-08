@@ -3,7 +3,7 @@ defmodule UnicodeSecurity.ReleaseCandidatePackageTest do
 
   import ExUnit.CaptureIO
 
-  alias UnicodeSecurity.ReleaseCandidate.Package
+  alias UnicodeSecurity.ReleaseCandidate.{Package, Report, Runner}
 
   @files Enum.sort(
            ~w(.formatter.exs CHANGELOG.md LICENSE README.md THIRD_PARTY_NOTICES.md hex_metadata.config mix.exs lib/example.ex lib/nested/child.ex)
@@ -283,6 +283,155 @@ defmodule UnicodeSecurity.ReleaseCandidatePackageTest do
     assert_receive {:raised_env, env}
     temporary = env |> List.keyfind("MIX_HOME", 0) |> elem(1) |> Path.dirname()
     refute File.exists?(temporary)
+  end
+
+  test "package cleanup exception retains the original failed command diagnostics", context do
+    cleanup = fn path -> raise File.Error, reason: :eacces, action: "remove", path: path end
+    boundary = fn _, _, _ -> {"original package build failed", 17} end
+
+    assert {:error, result} =
+             Package.verify(context.root,
+               cmd: boundary,
+               tmp_dir: context.directory,
+               cleanup: cleanup
+             )
+
+    assert result.status == 17
+    assert result.output == "original package build failed"
+    assert ["mix", "hex.build", "--output", archive] = result.argv
+    assert result.duration_ms >= 0
+    assert result.cleanup.reason == :exception
+    assert result.cleanup.path == Path.dirname(archive)
+    assert result.cleanup.output =~ "permission denied"
+  end
+
+  test "successful package verification fails when cleanup returns an error", context do
+    boundary = build_boundary(context, fn _, _ -> {"consumer passed", 0} end)
+    cleanup = fn path -> {:error, :eacces, path} end
+
+    assert {:error, result} =
+             Package.verify(context.root,
+               cmd: boundary,
+               tmp_dir: context.directory,
+               cleanup: cleanup
+             )
+
+    assert result.reason == :cleanup_failed
+    assert result.consumer == :passed
+    assert result.cleanup == %{reason: :eacces, path: Path.dirname(result.archive)}
+  end
+
+  test "package cleanup catches exits and throws without replacing original failure", context do
+    for {kind, value} <- [exit: :cleanup_exit, throw: :cleanup_throw] do
+      cleanup = fn _ -> apply(:erlang, kind, [value]) end
+
+      assert {:error, result} =
+               Package.verify(context.root,
+                 cmd: fn _, _, _ -> {"original failure", 23} end,
+                 tmp_dir: context.directory,
+                 cleanup: cleanup
+               )
+
+      assert result.status == 23
+      assert result.output == "original failure"
+      assert result.cleanup.reason == kind
+      assert result.cleanup.output == "cleanup #{kind}: :cleanup_#{kind}"
+    end
+  end
+
+  test "package still cleans temporary state when its command boundary exits or throws",
+       context do
+    owner = self()
+
+    for {kind, value} <- [exit: :command_exit, throw: :command_throw] do
+      boundary = fn _, _, opts ->
+        send(owner, {:interrupted_package, opts[:env]})
+        apply(:erlang, kind, [value])
+      end
+
+      assert {:error, result} =
+               Package.verify(context.root, cmd: boundary, tmp_dir: context.directory)
+
+      assert result.reason == kind
+      assert result.output =~ "command_#{kind}"
+      assert_receive {:interrupted_package, env}
+      temporary = env |> List.keyfind("MIX_HOME", 0) |> elem(1) |> Path.dirname()
+      refute File.exists?(temporary)
+    end
+  end
+
+  test "runner replaces stale passed evidence and finalizes after package cleanup fails",
+       context do
+    git!(context.root, ["config", "user.name", "RC cleanup test"])
+    git!(context.root, ["config", "user.email", "rc-cleanup@example.invalid"])
+    git!(context.root, ["add", "."])
+    git!(context.root, ["commit", "--quiet", "-m", "baseline"])
+    commit = String.trim(git!(context.root, ["rev-parse", "HEAD"]))
+    report_path = Path.join(context.directory, "report.term")
+    previous = %{status: :passed, commit: "stale evidence"}
+    Report.write!(report_path, previous)
+    owner = self()
+
+    cleanup = fn path ->
+      File.write!(Path.join(context.root, "cleanup-mutated.txt"), "mutation\n")
+      git!(context.root, ["commit", "--quiet", "--allow-empty", "-m", "cleanup changed HEAD"])
+      raise File.Error, reason: :eacces, action: "remove", path: path
+    end
+
+    package = %{
+      name: :package,
+      run: fn _ ->
+        Package.verify(context.root,
+          cmd: fn _, _, _ -> {"original command failure", 29} end,
+          tmp_dir: context.directory,
+          cleanup: cleanup
+        )
+      end
+    }
+
+    later = %{
+      name: :never,
+      run: fn _ ->
+        send(owner, :unexpected_stage)
+        {:ok, %{}}
+      end
+    }
+
+    outcome =
+      try do
+        Runner.run(
+          root: context.root,
+          version: "0.1.0",
+          report_path: report_path,
+          stages: [package, later]
+        )
+      rescue
+        File.Error ->
+          stale = File.read!(report_path) |> :erlang.binary_to_term()
+          IO.puts("cleanup escaped and left #{stale.status} evidence for #{stale.commit}")
+          {:cleanup_escaped, stale}
+      end
+
+    assert {:error, report} = outcome
+    assert report.status == :failed
+    assert report.commit == commit
+    assert report.repository.before == ""
+    assert report.repository.after == "?? cleanup-mutated.txt\n"
+    refute report.repository.unchanged?
+
+    assert [
+             %{name: :package, status: :failed, result: result},
+             %{name: :repository_commit, status: :failed, result: identity}
+           ] = report.stages
+
+    assert result.status == 29
+    assert result.output == "original command failure"
+    assert result.cleanup.reason == :exception
+    assert identity.expected_commit == commit
+    assert identity.actual_commit == String.trim(git!(context.root, ["rev-parse", "HEAD"]))
+    assert File.read!(report_path) |> :erlang.binary_to_term() == report
+    refute report == previous
+    refute_receive :unexpected_stage
   end
 
   # Breaks: private Hex bootstrapping or a fresh consumer unable to compile the real payload.
