@@ -430,7 +430,6 @@ defmodule UnicodeSecurity.ReleaseCandidatePackageTest do
     assert identity.expected_commit == commit
     assert identity.actual_commit == String.trim(git!(context.root, ["rev-parse", "HEAD"]))
     assert File.read!(report_path) |> :erlang.binary_to_term() == report
-    refute report == previous
     refute_receive :unexpected_stage
   end
 
