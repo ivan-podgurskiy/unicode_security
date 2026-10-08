@@ -470,11 +470,23 @@ defmodule UnicodeSecurity.ReleaseCandidatePackageTest do
     File.rm!(contents)
   end
 
-  defp build_boundary(context, consumer) do
+  test "package test boundary accepts resolved mix.bat and rejects a different executable",
+       context do
+    executable = "C:\\Program Files\\Beam\\bin\\mix.bat"
+    consumer = fn _, _ -> {"command identity accepted", 19} end
+    boundary = build_boundary(context, consumer, executable)
+    assert {"command identity accepted", 19} = boundary.(executable, [], [])
+
+    assert_raise ExUnit.AssertionError, fn ->
+      boundary.("C:\\Other Beam\\bin\\mix.bat", [], [])
+    end
+  end
+
+  defp build_boundary(context, consumer, expected_executable \\ System.find_executable("mix")) do
     owner = self()
 
     fn executable, args, options ->
-      assert Path.basename(executable) == "mix"
+      assert executable == expected_executable
       result = consumer.(args, options)
       complete_build(context, args, owner, result)
       result
