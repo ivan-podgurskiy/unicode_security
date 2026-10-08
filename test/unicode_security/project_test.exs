@@ -129,6 +129,18 @@ defmodule UnicodeSecurity.ProjectTest do
     refute workflow =~ ~r/secrets\.|HEX_API_KEY|HEX_API_TOKEN|GITHUB_TOKEN|GH_TOKEN/
   end
 
+  test "changelog notes are public and still undated" do
+    changelog = File.read!("CHANGELOG.md")
+
+    assert changelog =~ "## [0.1.0] - Unreleased"
+    assert changelog =~ "UnicodeSecurity.skeleton/1"
+    assert changelog =~ "check/2"
+    assert changelog =~ "type: :domain"
+    refute changelog =~ "M5A"
+    refute changelog =~ "M5C"
+    refute changelog =~ "Milestone"
+  end
+
   test "readme matches the published git_trailers page shape" do
     readme = File.read!("README.md")
     words = readme |> String.split() |> length()
