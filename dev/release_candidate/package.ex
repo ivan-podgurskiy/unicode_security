@@ -19,13 +19,13 @@ defmodule UnicodeSecurity.ReleaseCandidate.Package do
       try do
         File.mkdir_p!(temporary)
         env = private_environment(temporary)
-        copy_hex_archive(temporary)
         command_opts = Keyword.put(opts, :env, env)
         archive = Path.join(temporary, "package.tar")
         unpacked = Path.join(temporary, "package")
         consumer = Path.join(temporary, "consumer")
 
-        with {:ok, _} <-
+        with :ok <- copy_hex_archive(temporary, opts),
+             {:ok, _} <-
                Command.run(root, "mix", ["hex.build", "--output", archive], command_opts),
              {:ok, {archive_metadata, tarball}} <- read_archive(archive),
              :ok <- unpack_archive(tarball, unpacked),
@@ -243,14 +243,33 @@ defmodule UnicodeSecurity.ReleaseCandidate.Package do
   end
 
   # Reuse installed Hex code without sharing its writable home/cache with the verifier.
-  defp copy_hex_archive(temporary) do
-    mix_home = System.get_env("MIX_HOME") || Path.join(System.user_home!(), ".mix")
-    archives = System.get_env("MIX_ARCHIVES") || Path.join(mix_home, "archives")
-    destination = Path.join(temporary, "mix/archives")
-    File.mkdir_p!(destination)
+  # An empty copy used to fall through to an interactive Hex install, which waits on stdin.
+  defp copy_hex_archive(temporary, opts) do
+    archives =
+      Keyword.get_lazy(opts, :hex_archives, fn ->
+        mix_home = System.get_env("MIX_HOME") || Path.join(System.user_home!(), ".mix")
+        System.get_env("MIX_ARCHIVES") || Path.join(mix_home, "archives")
+      end)
 
-    for source <- Path.wildcard(Path.join(archives, "hex-*")),
-        do: File.cp_r!(source, Path.join(destination, Path.basename(source)))
+    sources = Path.wildcard(Path.join(archives, "hex-*"))
+
+    if sources == [] do
+      {:error,
+       %{
+         reason: :hex_archive_missing,
+         path: archives,
+         output: "Hex archive not found in #{archives}"
+       }}
+    else
+      destination = Path.join(temporary, "mix/archives")
+      File.mkdir_p!(destination)
+
+      Enum.each(sources, fn source ->
+        File.cp_r!(source, Path.join(destination, Path.basename(source)))
+      end)
+
+      :ok
+    end
   end
 
   defp write_consumer(consumer, unpacked) do

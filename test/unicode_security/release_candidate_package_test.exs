@@ -626,6 +626,32 @@ defmodule UnicodeSecurity.ReleaseCandidatePackageTest do
     File.rm!(contents)
   end
 
+  # Breaks: waiting on an interactive Hex install when the private archive copy is empty.
+  test "reports a missing Hex archive without invoking mix", context do
+    archives = Path.join(context.directory, "empty-hex-archives")
+    temporary = Path.join(context.directory, "verify-tmp")
+    File.mkdir_p!(archives)
+    owner = self()
+
+    boundary = fn _, args, _ ->
+      send(owner, {:mix, args})
+      {"mix should not run", 0}
+    end
+
+    assert {:error, result} =
+             Package.verify(context.root,
+               cmd: boundary,
+               tmp_dir: temporary,
+               hex_archives: archives
+             )
+
+    assert result.reason == :hex_archive_missing
+    assert Paths.same?(result.path, archives)
+    assert result.output =~ archives
+    refute_received {:mix, _}
+    assert Path.wildcard(Path.join(temporary, "unicode-security-verification-*")) == []
+  end
+
   test "package test boundary accepts resolved mix.bat and rejects a different executable",
        context do
     executable = "C:\\Program Files\\Beam\\bin\\mix.bat"

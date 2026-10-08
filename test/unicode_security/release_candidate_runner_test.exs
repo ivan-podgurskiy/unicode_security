@@ -364,6 +364,28 @@ defmodule UnicodeSecurity.ReleaseCandidateRunnerTest do
     refute File.exists?(Path.join(context.root, "injected"))
   end
 
+  # Breaks: spawning mix.bat, which leaves the Windows Erlang port open.
+  test "launches Windows mix through the adjacent mix script" do
+    directory =
+      Path.join(System.tmp_dir!(), "unicode-security-mix-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(directory)
+    on_exit(fn -> File.rm_rf!(directory) end)
+    batch = Path.join(directory, "mix.bat")
+    script = Path.join(directory, "mix")
+    File.write!(batch, "@echo off\r\n")
+    File.write!(script, "Mix.CLI.main()\n")
+    elixir = System.find_executable("elixir")
+    args = ["hex.build", "--output", "pkg.tar"]
+
+    assert Command.script_launch(batch, args, {:win32, :nt}, elixir) == {elixir, [script | args]}
+    assert Command.script_launch(batch, args, {:unix, :darwin}, elixir) == {batch, args}
+    assert Command.script_launch(batch, args, {:win32, :nt}, nil) == {batch, args}
+
+    File.rm!(script)
+    assert Command.script_launch(batch, args, {:win32, :nt}, elixir) == {batch, args}
+  end
+
   # Breaks: an absent executable raising instead of producing a structured failure.
   test "returns a structured failure when the executable cannot be found", context do
     assert {:error, result} =
