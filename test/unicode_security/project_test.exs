@@ -129,6 +129,16 @@ defmodule UnicodeSecurity.ProjectTest do
     refute workflow =~ ~r/secrets\.|HEX_API_KEY|HEX_API_TOKEN|GITHUB_TOKEN|GH_TOKEN/
   end
 
+  test "roadmap stays on GitHub and out of the Hex archive" do
+    roadmap = File.read!("ROADMAP.md")
+    project = UnicodeSecurity.MixProject.project()
+
+    assert roadmap =~ "Ecto"
+    assert roadmap =~ "conflict"
+    refute "ROADMAP.md" in project[:package][:files]
+    refute "ROADMAP.md" in project[:docs][:extras]
+  end
+
   test "changelog notes are public and still undated" do
     changelog = File.read!("CHANGELOG.md")
 
