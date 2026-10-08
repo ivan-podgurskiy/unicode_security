@@ -251,7 +251,7 @@ defmodule UnicodeSecurity.ReleaseCandidate.Package do
         System.get_env("MIX_ARCHIVES") || Path.join(mix_home, "archives")
       end)
 
-    sources = Path.wildcard(Path.join(archives, "hex-*"))
+    sources = hex_archive_sources(archives)
 
     if sources == [] do
       {:error,
@@ -269,6 +269,19 @@ defmodule UnicodeSecurity.ReleaseCandidate.Package do
       end)
 
       :ok
+    end
+  end
+
+  # filelib wildcard treats backslash as an escape, so C:\Users\... matches nothing.
+  defp hex_archive_sources(archives) do
+    normalized = String.replace(archives, "\\", "/")
+
+    case File.ls(normalized) do
+      {:ok, names} ->
+        for name <- names, String.starts_with?(name, "hex-"), do: Path.join(normalized, name)
+
+      {:error, _} ->
+        []
     end
   end
 

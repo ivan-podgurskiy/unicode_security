@@ -652,6 +652,30 @@ defmodule UnicodeSecurity.ReleaseCandidatePackageTest do
     assert Path.wildcard(Path.join(temporary, "unicode-security-verification-*")) == []
   end
 
+  # Breaks: missing a Hex install because a Windows archive path uses backslashes.
+  test "copies a Hex archive addressed with Windows separators", context do
+    archives = Path.join(context.directory, "installed-hex")
+    File.mkdir_p!(Path.join(archives, "hex-2.0.0"))
+    File.write!(Path.join([archives, "hex-2.0.0", "hex.ez"]), "archive")
+    owner = self()
+
+    boundary = fn _, _, options ->
+      {_, mix_archives} = List.keyfind(options[:env], "MIX_ARCHIVES", 0)
+      send(owner, {:archives, File.ls!(mix_archives)})
+      {"stopped", 17}
+    end
+
+    assert {:error, %{status: 17}} =
+             Package.verify(context.root,
+               cmd: boundary,
+               tmp_dir: Path.join(context.directory, "copy-tmp"),
+               hex_archives: String.replace(archives, "/", "\\")
+             )
+
+    assert_receive {:archives, names}
+    assert "hex-2.0.0" in names
+  end
+
   test "package test boundary accepts resolved mix.bat and rejects a different executable",
        context do
     executable = "C:\\Program Files\\Beam\\bin\\mix.bat"
