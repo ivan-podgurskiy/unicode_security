@@ -2,7 +2,7 @@ defmodule UnicodeSecurity.ReleaseCandidateRunnerTest do
   use ExUnit.Case, async: true
 
   alias UnicodeSecurity.ReleaseCandidate.{Command, Report, Runner}
-  alias UnicodeSecurity.Test.ElixirRunner
+  alias UnicodeSecurity.Test.{ElixirRunner, Paths}
 
   setup do
     directory =
@@ -378,7 +378,10 @@ defmodule UnicodeSecurity.ReleaseCandidateRunnerTest do
     elixir = System.find_executable("elixir")
     args = ["hex.build", "--output", "pkg.tar"]
 
-    assert Command.script_launch(batch, args, {:win32, :nt}, elixir) == {elixir, [script | args]}
+    assert {^elixir, [launched_script | ^args]} =
+             Command.script_launch(batch, args, {:win32, :nt}, elixir)
+
+    assert Paths.same?(launched_script, script)
     assert Command.script_launch(batch, args, {:unix, :darwin}, elixir) == {batch, args}
     assert Command.script_launch(batch, args, {:win32, :nt}, nil) == {batch, args}
 

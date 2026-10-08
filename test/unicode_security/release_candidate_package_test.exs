@@ -657,6 +657,7 @@ defmodule UnicodeSecurity.ReleaseCandidatePackageTest do
     archives = Path.join(context.directory, "installed-hex")
     File.mkdir_p!(Path.join(archives, "hex-2.0.0"))
     File.write!(Path.join([archives, "hex-2.0.0", "hex.ez"]), "archive")
+    File.write!(Path.join(archives, "notes.txt"), "not an archive")
     owner = self()
 
     boundary = fn _, _, options ->
@@ -674,6 +675,31 @@ defmodule UnicodeSecurity.ReleaseCandidatePackageTest do
 
     assert_receive {:archives, names}
     assert "hex-2.0.0" in names
+    refute "notes.txt" in names
+  end
+
+  # Breaks: treating a missing archive directory as an empty successful copy.
+  test "reports a missing Hex archive directory without invoking mix", context do
+    archives = Path.join(context.directory, "missing-hex-archives")
+    temporary = Path.join(context.directory, "missing-verify-tmp")
+    owner = self()
+
+    boundary = fn _, args, _ ->
+      send(owner, {:mix, args})
+      {"mix should not run", 0}
+    end
+
+    assert {:error, result} =
+             Package.verify(context.root,
+               cmd: boundary,
+               tmp_dir: temporary,
+               hex_archives: archives
+             )
+
+    assert result.reason == :hex_archive_missing
+    assert Paths.same?(result.path, archives)
+    refute_received {:mix, _}
+    assert Path.wildcard(Path.join(temporary, "unicode-security-verification-*")) == []
   end
 
   test "package test boundary accepts resolved mix.bat and rejects a different executable",
